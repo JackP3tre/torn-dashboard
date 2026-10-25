@@ -1,0 +1,2140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torn Dashboard</title>
+<style>
+  /* Färger och former i stil med Torns gränssnitt */
+  :root {
+    --page: #e4e4e4;
+    --panel: #ffffff;
+    --row-alt: #f6f6f6;
+    --row-hover: #eef4fa;
+    --line: #dcdcdc;
+    --text: #333333;
+    --muted: #7a7a7a;
+    --head-a: #5c5c5c; --head-b: #333333; --head-text: #ffffff;
+    --green-a: #9ab83a; --green-b: #6b8a1c;
+    --top-a: #2e2e2e; --top-b: #161616;
+    --pos: #4f8a00;
+    --neg: #d0021b;
+    --warn: #c47a00;
+    --link: #0b6aa8;
+    --input: #ffffff;
+    --input-line: #c8c8c8;
+    --bar-bg: #e6e6e6;
+    --best: #f3f8e6;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .12);
+    /* Kategorifärger för net worth-uppdelningen */
+    --c1: #6b8a1c; --c2: #2f7fb5; --c3: #c47a00; --c4: #8a5cb8; --c5: #3a9e8f; --c6: #b5485d; --c7: #7a7a7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #191919;
+      --panel: #2a2a2a;
+      --row-alt: #2f2f2f;
+      --row-hover: #343c44;
+      --line: #3d3d3d;
+      --text: #dddddd;
+      --muted: #999999;
+      --head-a: #444444; --head-b: #222222;
+      --green-a: #7f9a2c; --green-b: #556d14;
+      --top-a: #1f1f1f; --top-b: #0c0c0c;
+      --pos: #8fcf3c;
+      --neg: #ff6b6b;
+      --warn: #f0a742;
+      --link: #6fb6ec;
+      --input: #1f1f1f;
+      --input-line: #4a4a4a;
+      --bar-bg: #3a3a3a;
+      --best: #33391f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5);
+      --c1: #8fb33a; --c2: #5aa6dc; --c3: #e3a043; --c4: #a982d6; --c5: #5cc0b1; --c6: #d9707f; --c7: #9a9a9a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--page); color: var(--text);
+    font: 13px/1.45 Arial, Helvetica, sans-serif;
+  }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 0 16px; }
+  [hidden] { display: none !important; }
+
+  /* Toppbar */
+  .topbar {
+    background: linear-gradient(var(--top-a), var(--top-b));
+    border-bottom: 1px solid #000; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  }
+  .topbar .wrap { display: flex; align-items: center; gap: 12px; height: 48px; }
+  .brand { color: #fff; font-weight: bold; font-size: 18px; letter-spacing: .5px; text-shadow: 0 1px 0 #000; }
+  .brand span { color: #b5d153; font-weight: normal; }
+  .topbar .spacer { flex: 1; }
+  .toplink { color: #ccc; font-size: 12px; background: none; border: 0; cursor: pointer; padding: 4px; }
+  .toplink:hover { color: #fff; text-decoration: underline; }
+
+  /* Sidrubrik */
+  .pagehead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 18px 0 10px; flex-wrap: wrap; }
+  .pagehead h1 { margin: 0; font-size: 22px; font-weight: normal; color: var(--text); }
+  .pagehead .sub { color: var(--muted); font-size: 12px; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 12px; align-items: start; padding-bottom: 32px; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .col { display: grid; gap: 12px; min-width: 0; }
+
+  /* Paneler */
+  .panel { background: var(--panel); border-radius: 4px; box-shadow: var(--shadow); overflow: hidden; }
+  .panel > h2 {
+    margin: 0; padding: 7px 10px; font-size: 12px; font-weight: bold; color: var(--head-text);
+    background: linear-gradient(var(--head-a), var(--head-b)); text-shadow: 0 1px 0 rgba(0,0,0,.6);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel > h2.green { background: linear-gradient(var(--green-a), var(--green-b)); }
+  .panel > h2 .right { margin-left: auto; font-weight: normal; font-size: 11px; opacity: .9; }
+  .panel > h2.toggle { cursor: pointer; user-select: none; }
+  .panel > h2.toggle::after { content: '▾'; font-size: 11px; }
+  .panel > h2.toggle:not(:has(.right))::after { margin-left: auto; }
+  .panel.closed > h2.toggle::after { content: '▸'; }
+  .panel.closed > .body { display: none; }
+  .body { padding: 10px; }
+  .body.flush { padding: 0; }
+  .note { color: var(--muted); font-size: 11px; line-height: 1.5; padding: 8px 10px; border-top: 1px solid var(--line); }
+  .note b { color: var(--text); }
+
+  /* Nyckel/värde-rader som i Torns infopaneler */
+  .kv { width: 100%; border-collapse: collapse; }
+  .kv td { padding: 5px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .kv tr:last-child td { border-bottom: 0; }
+  .kv td:first-child { font-weight: bold; white-space: nowrap; width: 1%; }
+  .kv td.num { text-align: right; white-space: nowrap; }
+  aside .kv td.num { white-space: normal; }
+  .kv tr.hl td { background: var(--best); }
+  .kv tr.big td { font-size: 15px; padding: 8px 10px; }
+  .kv tr.big td.num { font-weight: bold; }
+
+  /* Formulär */
+  .field { padding: 10px; border-top: 1px solid var(--line); }
+  .field label { display: block; font-weight: bold; margin-bottom: 5px; }
+  input[type=text], input[type=password], input:not([type]) {
+    width: 100%; padding: 6px 8px; font: 13px Arial, sans-serif; color: var(--text);
+    background: var(--input); border: 1px solid var(--input-line); border-radius: 3px;
+  }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 14px; font: bold 12px Arial, sans-serif; color: #fff; cursor: pointer;
+    background: linear-gradient(var(--green-a), var(--green-b)); border: 1px solid var(--green-b);
+    border-radius: 3px; text-shadow: 0 1px 0 rgba(0,0,0,.4);
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.dark { background: linear-gradient(var(--head-a), var(--head-b)); border-color: var(--head-b); }
+  .btn.block { width: 100%; margin-top: 8px; }
+  .linkbtn { background: none; border: 0; color: var(--link); cursor: pointer; font: 12px Arial, sans-serif; padding: 0; }
+  .linkbtn:hover { text-decoration: underline; }
+  .check { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; font-size: 12px; }
+  .check input { margin: 2px 0 0; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; }
+
+  /* Meddelanden */
+  .msg { padding: 8px 10px; border-radius: 4px; font-size: 12px; box-shadow: var(--shadow); background: var(--panel); border-left: 4px solid var(--link); }
+  .msg.error { border-left-color: var(--neg); color: var(--neg); }
+  .msg .spin {
+    display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px;
+    border: 2px solid var(--line); border-top-color: var(--link); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Stapel i stil med Torns energistapel */
+  .meter { padding: 10px; border-top: 1px solid var(--line); }
+  .meter .top { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .bar { height: 7px; background: var(--bar-bg); border-radius: 2px; overflow: hidden; }
+  .bar i {
+    display: block; height: 100%; border-radius: 2px;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 4px, transparent 4px 8px), linear-gradient(var(--green-a), var(--green-b));
+  }
+  .bar.warn i { background: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 4px, transparent 4px 8px), linear-gradient(#e6a23c, #b8770f); }
+  .bar.bad i { background: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 4px, transparent 4px 8px), linear-gradient(#e0605a, #a8261f); }
+  .verdict { padding: 8px 10px; border-top: 1px solid var(--line); font-weight: bold; }
+
+  /* Net worth-uppdelning */
+  .stack { display: flex; height: 10px; margin: 10px; border-radius: 2px; overflow: hidden; background: var(--bar-bg); }
+  .stack i { display: block; height: 100%; }
+  .legend { list-style: none; margin: 0; padding: 0; }
+  .legend li { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; padding: 5px 10px; border-top: 1px solid var(--line); font-size: 12px; }
+  .legend .dot { width: 10px; height: 10px; border-radius: 2px; }
+  .legend .share { color: var(--muted); font-size: 11px; min-width: 38px; text-align: right; }
+
+  /* Datatabeller */
+  .tablewrap { overflow-x: auto; }
+  table.data { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.data th {
+    text-align: left; padding: 6px 8px; font-size: 11px; font-weight: bold; color: var(--muted);
+    border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--row-alt);
+  }
+  table.data th[data-sort] { cursor: pointer; user-select: none; }
+  table.data th[data-sort]:hover { color: var(--text); }
+  table.data th .arrow { font-size: 9px; margin-left: 3px; }
+  table.data td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+  table.data tbody tr:nth-child(even) td { background: var(--row-alt); }
+  table.data tbody tr:hover td { background: var(--row-hover); }
+  table.data tbody tr.best td { background: var(--best); }
+  table.data tbody tr.dim td { color: var(--muted); }
+  table.data tbody tr.dim img { opacity: .5; }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  .num { text-align: right !important; }
+  .stock { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+  .stock img, .stock .ico { width: 24px; height: 24px; border-radius: 3px; flex: none; object-fit: contain; }
+  .stock .ico { display: grid; place-items: center; background: linear-gradient(var(--head-a), var(--head-b)); color: #fff; font-weight: bold; font-size: 12px; }
+  .stock b { display: block; }
+  .stock small { display: block; color: var(--muted); font-size: 11px; white-space: normal; max-width: 280px; }
+  table.data td input:not([type]) { width: 100px; padding: 3px 6px; font-size: 12px; text-align: right; }
+  .roi { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+  .roi .bar { width: 46px; height: 5px; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .muted { color: var(--muted); }
+
+  /* Etiketter */
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: bold; line-height: 1; padding: 3px 6px; border-radius: 2px;
+    color: #fff; background: #8a8a8a; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-b); }
+  .tag.warn { background: #c47a00; }
+  .tag.bad { background: #c0281f; }
+  .tag.info { background: var(--link); }
+
+  /* Åtgärdslista */
+  .acts { list-style: none; margin: 0; padding: 0; }
+  .acts li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  .acts li:last-child { border-bottom: 0; }
+  .acts li .tag { flex: none; width: 42px; text-align: center; margin-top: 1px; }
+  .acts li.info { color: var(--muted); }
+
+  .toolbar { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .toolbar .muted { margin-left: auto; font-size: 11px; }
+  ul.plain { margin: 0; padding: 0; list-style: none; }
+  ul.plain li { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  ul.plain li:last-child { border-bottom: 0; }
+
+  /* Nyckeltal i rad */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-bottom: 1px solid var(--line); }
+  .tiles > div { padding: 8px 10px; border-right: 1px solid var(--line); }
+  .tiles > div:last-child { border-right: 0; }
+  .tiles small { display: block; color: var(--muted); font-size: 11px; }
+  .tiles b { font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .chip {
+    font: 11px Arial, sans-serif; padding: 3px 8px; border-radius: 10px; cursor: pointer;
+    background: var(--row-alt); color: var(--text); border: 1px solid var(--line);
+  }
+  .chip.on { background: linear-gradient(var(--green-a), var(--green-b)); color: #fff; border-color: var(--green-b); }
+
+  /* Flikar i stil med Torns sidflikar */
+  .tabs { display: flex; gap: 2px; margin-top: 14px; border-bottom: 2px solid var(--green-b); }
+  .tabs button {
+    padding: 7px 18px; font: bold 12px Arial, sans-serif; cursor: pointer; color: #ddd; border: 0;
+    background: linear-gradient(var(--head-a), var(--head-b)); border-radius: 4px 4px 0 0; text-shadow: 0 1px 0 #000;
+  }
+  .tabs button.on { background: linear-gradient(var(--green-a), var(--green-b)); color: #fff; }
+
+  /* Mål, statusar och snabbknappar (Halloween) */
+  .quick { display: grid; gap: 6px; padding: 10px; }
+  .quick .btn { justify-content: flex-start; text-decoration: none; }
+  .st { font-weight: bold; }
+  .st.okay { color: var(--pos); }
+  .st.hospital { color: var(--neg); }
+  .st.travel { color: var(--link); }
+  .st.jail { color: var(--warn); }
+  .st.gone { color: var(--muted); }
+  .ldot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; background: #999; }
+  .ldot.Online { background: #5bb500; }
+  .ldot.Idle { background: #e6a23c; }
+  .ldot.Offline { background: #9a9a9a; }
+  .btn.small { padding: 3px 10px; font-size: 11px; text-decoration: none; }
+  .btn.off { filter: grayscale(1) opacity(.55); }
+  /* Knapp i panelrubrik */
+  .hbtn {
+    font: bold 11px Arial, sans-serif; color: #fff; cursor: pointer; padding: 3px 9px; border-radius: 3px;
+    background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.35); text-shadow: none; flex: none;
+  }
+  .hbtn:hover { background: rgba(0,0,0,.4); }
+  .hbtn:disabled { opacity: .6; cursor: default; }
+  .panel > h2 .right + .hbtn { margin-left: 8px; }
+  a.hbtn { text-decoration: none; }
+  /* Relaterade knappar (Xanax + energy refill) sitter ihop som ett par */
+  .btngroup { display: flex; gap: 0; }
+  .btngroup .btn { flex: 1; justify-content: center; }
+  .btngroup .btn:first-child { border-radius: 3px 0 0 3px; }
+  .btngroup .btn:last-child { border-radius: 0 3px 3px 0; border-left: 1px solid rgba(0,0,0,.25); }
+  .hbtn + .hbtn { margin-left: 4px; }
+  .lowenergy { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 8px 10px; background: rgba(240, 144, 42, .15); border-bottom: 1px solid var(--line); font-weight: bold; color: var(--warn); }
+
+  .next { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center; padding: 12px 10px; }
+  .next .who b { font-size: 16px; }
+  .next .who small { display: block; margin-top: 2px; }
+  .next .big { font-size: 26px; font-weight: bold; font-variant-numeric: tabular-nums; text-align: right; }
+  .next .big.now { color: var(--pos); font-size: 18px; }
+  .next .btn { padding: 9px 22px; font-size: 14px; text-decoration: none; }
+  .next .empty { grid-column: 1 / -1; color: var(--muted); }
+  .then { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--line); background: var(--row-alt); font-size: 12px; }
+  .then .lbl { color: var(--muted); font-weight: bold; text-transform: uppercase; font-size: 10px; letter-spacing: .3px; }
+  .then .timer { margin-left: auto; font-weight: bold; font-variant-numeric: tabular-nums; }
+  @media (max-width: 560px) { .next { grid-template-columns: 1fr; } .next .big { text-align: left; } }
+
+  /* Halloween */
+  .panel > h2.orange { background: linear-gradient(#f0902a, #b4530c); }
+  .btn.orange { background: linear-gradient(#f0902a, #b4530c); border-color: #b4530c; }
+  .tabs button.hw.on { background: linear-gradient(#f0902a, #b4530c); }
+  #tab-hw .next .btn:not(.off) { background: linear-gradient(#f0902a, #b4530c); border-color: #b4530c; }
+  .addgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 10px; }
+  .addgrid label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 12px; }
+  .addgrid .btn { margin-top: 6px; }
+  select {
+    width: 100%; padding: 6px 8px; font: 13px Arial, sans-serif; color: var(--text);
+    background: var(--input); border: 1px solid var(--input-line); border-radius: 3px;
+  }
+  textarea {
+    width: 100%; padding: 6px 8px; font: 12px Arial, sans-serif; color: var(--text); resize: vertical;
+    background: var(--input); border: 1px solid var(--input-line); border-radius: 3px;
+  }
+  kbd { font: bold 11px Arial, sans-serif; padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--row-alt); color: var(--text); }
+  tfoot td { padding: 6px 8px; border-top: 2px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  tfoot tr.total td { font-weight: bold; font-size: 14px; background: var(--best); }
+  tfoot tr.total td small { font-size: 11px; font-weight: normal; }
+  #hTable td:last-child, #hTable th:last-child { white-space: nowrap; }
+  .xbtn { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 6px; }
+  .xbtn:hover { color: var(--neg); }
+
+  /* Startvy */
+  .setup { max-width: 460px; margin: 40px auto; }
+  .setup .body p { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .keyinfo { border-top: 1px solid var(--line); padding: 10px 0 0; }
+  .keyinfo > b { display: block; padding: 0 10px 6px; font-size: 12px; }
+  .keyinfo .kv td { font-size: 12px; }
+  .keyinfo .kv td:last-child { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">TORN <span>Dashboard</span></div>
+    <div class="spacer"></div>
+    <button class="toplink" id="logout" hidden>Change key</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Startvy: ange API-nyckel -->
+  <section class="panel setup" id="setup">
+    <h2>API key</h2>
+    <div class="body">
+      <p>Create a key in Torn under <b>Settings → API Keys</b>
+        (<a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener">link</a>).
+        <b>Limited</b> access is enough. The key is only stored in this browser.</p>
+      <div class="row">
+        <input id="key" type="password" placeholder="16 characters" autocomplete="off" spellcheck="false">
+        <button class="btn" id="save">Start</button>
+      </div>
+    </div>
+    <div class="keyinfo">
+      <b>How your API key is used</b>
+      <table class="kv">
+        <tr><td>Storage</td><td>Only in your own browser (localStorage on this device). It is never saved on a server.</td></tr>
+        <tr><td>Sharing</td><td>Sent only directly to Torn's official API (api.torn.com). Never shared with the site owner or anyone else.</td></tr>
+        <tr><td>Purpose</td><td>Reads your own data – stocks, money, items, energy, attacks and player statuses – to show it here. Nothing is changed in your account.</td></tr>
+        <tr><td>Access level</td><td><b>Limited</b> is enough. Do not use a Full key.</td></tr>
+        <tr><td>Removal</td><td>Click <b>Change key</b> at the top to delete it from this browser at any time.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <div id="dash" hidden>
+    <nav class="tabs">
+      <button data-tab="inv" class="on">Investments</button>
+      <button data-tab="hw" class="hw">🎃 Halloween</button>
+    </nav>
+
+    <div id="tab-inv">
+    <div class="pagehead">
+      <h1>Investments</h1>
+      <span class="sub">Stock benefit blocks, City Bank, items and net worth</span>
+    </div>
+
+    <div class="layout">
+      <!-- Vänsterkolumn -->
+      <aside class="col">
+        <section class="panel">
+          <h2>Information</h2>
+          <table class="kv">
+            <tr class="big hl"><td>Net worth</td><td class="num" id="iNetworth">–</td></tr>
+            <tr><td>Wallet</td><td class="num" id="iWallet">–</td></tr>
+            <tr><td>City Bank</td><td class="num" id="iBank">–</td></tr>
+            <tr><td>Bank merits</td><td class="num" id="iMerits">–</td></tr>
+            <tr><td>Points</td><td class="num" id="iPoints">–</td></tr>
+            <tr><td>Point price</td><td class="num" id="iPoint">–</td></tr>
+            <tr><td>Updated</td><td class="num" id="iUpdated">–</td></tr>
+          </table>
+          <div class="field">
+            <label for="budget">Spare cash to include ($)</label>
+            <input id="budget" inputmode="decimal" placeholder="e.g. 500m or 1.2b">
+            <label class="check" id="bankManualRow" style="margin-top:8px">
+              <input type="checkbox" id="bankManual"> <span>I already have a City Bank investment running</span>
+            </label>
+            <button class="btn block" id="invRefresh">Refresh data</button>
+          </div>
+        </section>
+
+        <section class="panel" id="nwCard" hidden>
+          <h2>Net worth breakdown<span class="right" id="nwTotal"></span></h2>
+          <div class="stack" id="nwStack"></div>
+          <ul class="legend" id="nwList"></ul>
+          <div class="note" id="nwNote"></div>
+        </section>
+
+        <section class="panel closed">
+          <h2 class="toggle">How it is calculated</h2>
+          <div class="body flush">
+            <div class="note" style="border-top:0">
+              <b>Stocks:</b> the cost is for your <i>next</i> benefit block. Each new block needs twice as many shares as
+              the previous one, so the return drops the more blocks you own. Shares can be sold back (0.1 % fee), but the
+              price can move. Benefit values come from the item market and points market; energy is valued against Xanax
+              (250 energy).
+            </div>
+            <div class="note">
+              <b>City Bank:</b> Torn's base rates plus your Bank Interest merits (+5 % per level). Only one investment at a
+              time, max $2,000,000,000. <b>TCI</b> adds +10 % on top, valued as the extra interest on your running
+              investment, or on a full $2b if you have none.
+            </div>
+            <div class="note">
+              <b>Optimal allocation</b> = the same total capital (stocks with known benefit values, TCI, any bank deposit
+              and spare cash) placed in the benefit blocks and bank options that pay the most per dollar. Other passive
+              benefits, benefits without a value and a running bank deposit count as locked and are left alone. Price
+              movements are not included.
+            </div>
+            <div class="note">
+              <b>Items:</b> valued at Torn's market price per item. Torn caches the inventory for up to an hour, so
+              recent changes can take a while to show.
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- Huvudkolumn -->
+      <main class="col">
+        <div class="msg" id="invStatus" hidden></div>
+
+        <section class="panel" id="planCard" hidden>
+          <h2>Have you invested well?</h2>
+          <table class="kv">
+            <tr><td>Your return now</td><td class="num" id="curIncome"></td><td class="num muted" id="curRoi"></td></tr>
+            <tr><td>Optimal allocation</td><td class="num" id="optIncome"></td><td class="num muted" id="optRoi"></td></tr>
+            <tr><td>Difference</td><td class="num" id="diffIncome"></td><td class="num muted" id="diffMeta"></td></tr>
+            <tr><td>Invested capital</td><td class="num" id="capital"></td><td></td></tr>
+            <tr><td>Passive income</td><td class="num" id="passiveDay"></td><td class="num muted" id="passiveMonth"></td></tr>
+            <tr id="idleRow"><td>Idle cash</td><td class="num" id="idleCash"></td><td class="num muted" id="idleMeta"></td></tr>
+            <tr class="hl"><td>Best next purchase</td><td class="num" id="bestName"></td><td class="num muted" id="bestMeta"></td></tr>
+          </table>
+          <div class="meter">
+            <div class="top"><b>Efficiency</b><span id="effPct"></span></div>
+            <div class="bar" id="effBar"><i></i></div>
+          </div>
+          <div class="verdict" id="verdict"></div>
+        </section>
+
+        <section class="panel">
+          <h2 class="green">Suggested changes</h2>
+          <ul class="acts" id="planList"></ul>
+        </section>
+
+        <section class="panel" id="divCard" hidden>
+          <h2>Payouts &amp; income<span class="right" id="divSum"></span></h2>
+          <div class="tablewrap">
+            <table class="data">
+              <thead><tr>
+                <th>Source</th>
+                <th class="num">Blocks</th>
+                <th class="num">Per payout</th>
+                <th class="num">Every</th>
+                <th class="num">Per year</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody id="divBody"></tbody>
+              <tfoot id="divFoot"></tfoot>
+            </table>
+          </div>
+          <div class="note">Torn's API does not expose your job's wage – enter it once (as shown under Job Information on
+            your Torn home page) and it is remembered. The salary is counted here but not in your investment return.</div>
+        </section>
+
+        <section class="panel" id="portCard" hidden>
+          <h2>Your portfolio<span class="right" id="portTotal"></span></h2>
+          <div class="tablewrap">
+            <table class="data">
+              <thead><tr>
+                <th>Stock</th>
+                <th class="num">Shares</th>
+                <th class="num">Blocks</th>
+                <th class="num">Value</th>
+                <th class="num">Price gain</th>
+                <th class="num">Benefit / yr</th>
+                <th class="num">ROI / yr</th>
+                <th>Assessment</th>
+              </tr></thead>
+              <tbody id="portBody"></tbody>
+            </table>
+          </div>
+          <div class="note">
+            ROI is calculated on the current value of the shares. A “+” after the block count means you own shares beyond
+            your last full block, which give no benefit until the next block is complete. Price gain = value now minus
+            what you paid.
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Next purchase – all options</h2>
+          <div class="toolbar">
+            <label class="check"><input type="checkbox" id="onlyAfford"> <span>Only within spare cash</span></label>
+            <span class="muted">Click a column to sort</span>
+          </div>
+          <div class="tablewrap">
+            <table class="data" id="optTable">
+              <thead><tr>
+                <th data-sort="name">Option</th>
+                <th class="num" data-sort="block">Block</th>
+                <th class="num" data-sort="cost">Cost</th>
+                <th class="num" data-sort="value">Payout</th>
+                <th class="num" data-sort="freq">Every</th>
+                <th class="num" data-sort="roi">ROI / yr</th>
+                <th class="num" data-sort="breakEven">Break-even</th>
+              </tr></thead>
+              <tbody id="invBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel" id="itemCard" hidden>
+          <h2>Items<span class="right" id="itemTotal"></span></h2>
+          <div class="tiles">
+            <div><small>Inventory value</small><b id="itValue">–</b></div>
+            <div><small>Sellable (not equipped)</small><b id="itSellable">–</b></div>
+            <div><small>Equipped</small><b id="itEquipped">–</b></div>
+            <div><small>If sold and invested</small><b id="itCouldEarn">–</b></div>
+          </div>
+          <div class="chips" id="itChips"></div>
+          <div class="tablewrap">
+            <table class="data" id="itemTable">
+              <thead><tr>
+                <th data-isort="name">Item</th>
+                <th data-isort="type">Category</th>
+                <th class="num" data-isort="amount">Qty</th>
+                <th class="num" data-isort="price">Market price</th>
+                <th class="num" data-isort="total">Total</th>
+              </tr></thead>
+              <tbody id="itemBody"></tbody>
+            </table>
+          </div>
+          <div class="note" id="itemNote"></div>
+        </section>
+
+        <section class="panel closed">
+          <h2 class="toggle">Passive benefits (no payout)</h2>
+          <div class="body flush"><ul class="plain" id="passiveList"></ul></div>
+        </section>
+      </main>
+    </div>
+    </div>
+
+    <!-- ================= Halloween ================= -->
+    <div id="tab-hw" hidden>
+      <div class="pagehead">
+        <h1>Trick or Treat</h1>
+        <span class="sub">Every attack you start can drop a treat – line up easy targets and keep attacking</span>
+      </div>
+
+      <div class="layout">
+        <aside class="col">
+          <section class="panel">
+            <h2 class="orange">Energy</h2>
+            <table class="kv">
+              <tr class="big"><td>Energy</td><td class="num" id="hEnergy">–</td></tr>
+              <tr><td>Attacks left</td><td class="num" id="hAttacksLeft">–</td></tr>
+              <tr><td>Next +5 energy</td><td class="num" id="hTick">–</td></tr>
+              <tr><td>Full in</td><td class="num" id="hFull">–</td></tr>
+              <tr><td>Drug cooldown</td><td class="num" id="hDrug">–</td></tr>
+              <tr><td>Booster cooldown</td><td class="num" id="hBooster">–</td></tr>
+            </table>
+            <div class="meter" style="padding-top:6px"><div class="bar" id="hEnergyBar"><i></i></div></div>
+            <div class="quick">
+              <div class="btngroup">
+                <a class="btn orange" target="_blank" rel="noopener" href="https://www.torn.com/item.php#drugs-items">💊 Your Xanax</a>
+                <a class="btn orange" target="_blank" rel="noopener" href="https://www.torn.com/points.php">⚡ Energy refill</a>
+              </div>
+              <a class="btn dark" target="_blank" rel="noopener" href="https://www.torn.com/factions.php?step=your#/tab=armoury&start=0&sub=drugs">Faction armoury · drugs (Xanax)</a>
+              <div class="btngroup">
+                <a class="btn dark" target="_blank" rel="noopener" href="https://www.torn.com/item.php#boosters-items">🚀 Your boosters</a>
+                <a class="btn dark" target="_blank" rel="noopener" href="https://www.torn.com/item.php#energy-drinks-items">🥤 Energy drinks</a>
+              </div>
+              <a class="btn dark" target="_blank" rel="noopener" href="https://www.torn.com/factions.php?step=your#/tab=armoury&start=0&sub=boosters">Faction armoury · boosters</a>
+              <a class="btn dark" target="_blank" rel="noopener" href="https://www.torn.com/shops.php?step=candy">Sally's Sweet Shop</a>
+              <a class="btn orange" target="_blank" rel="noopener" href="https://www.torn.com/item.php#special-items">🎃 Open basket · exchange treats</a>
+            </div>
+          </section>
+        </aside>
+
+        <main class="col">
+          <div class="msg" id="hStatus" hidden></div>
+
+          <section class="panel">
+            <h2 class="orange">Next target<span class="right" id="hNextCount"></span>
+              <a class="hbtn" target="_blank" rel="noopener" href="https://www.torn.com/item.php#drugs-items" title="Your drugs – Xanax">💊 Xanax</a>
+              <a class="hbtn" target="_blank" rel="noopener" href="https://www.torn.com/points.php" title="Points building – energy refill">⚡ Refill energy</a>
+              <button class="hbtn" id="hRefreshTop" title="Check target statuses now">⟳ Refresh</button></h2>
+            <div class="lowenergy" id="hLowEnergy" hidden>
+              <span>⚡ Not enough energy for an attack (25 needed).</span>
+              <span class="btngroup">
+                <a class="btn orange small" target="_blank" rel="noopener" href="https://www.torn.com/item.php#drugs-items">💊 Take a Xanax</a>
+                <a class="btn orange small" target="_blank" rel="noopener" href="https://www.torn.com/points.php">⚡ Energy refill</a>
+              </span>
+            </div>
+            <div class="next" id="hNextBody"></div>
+            <div class="then" id="hThenBody"></div>
+            <div class="note" style="margin:0">Press <kbd>A</kbd> or <kbd>Space</kbd> to open the attack page for the next target.
+              Each click moves the target to the back of the queue until its new status has been checked.</div>
+          </section>
+
+          <section class="panel">
+            <div class="tiles">
+              <div><small>Treats (session)</small><b id="hTreatsTile">–</b></div>
+              <div><small>Attacks opened (session)</small><b id="hOpened">0</b></div>
+              <div><small>Attacks won (session)</small><b id="hWon">–</b></div>
+              <div><small>Pace</small><b id="hPace">–</b></div>
+              <div><small>Session time</small><b id="hSession">–</b></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>Add targets</h2>
+            <div class="addgrid">
+              <div>
+                <label for="hAddIds">Player IDs or profile links</label>
+                <textarea id="hAddIds" rows="3" placeholder="1234567, 2345678 or https://www.torn.com/profiles.php?XID=1234567"></textarea>
+                <button class="btn" id="hAddIdsBtn">Add players</button>
+              </div>
+              <div>
+                <label for="hFacId">Whole faction</label>
+                <input id="hFacId" inputmode="numeric" placeholder="Faction ID">
+                <button class="btn dark" id="hFacBtn">Add all members</button>
+              </div>
+              <div>
+                <label for="hAtkRange">Players you have defeated</label>
+                <select id="hAtkRange">
+                  <option value="6">Last 6 hours</option>
+                  <option value="24" selected>Last 24 hours</option>
+                  <option value="72">Last 3 days</option>
+                  <option value="168">Last 7 days</option>
+                </select>
+                <button class="btn orange" id="hAtkBtn">Import from my attacks</button>
+                <label class="check" style="margin-top:8px;font-weight:normal">
+                  <input type="checkbox" id="hAtkAuto"> <span>Auto-add new players I defeat</span>
+                </label>
+              </div>
+            </div>
+            <div class="toolbar" style="border-top:1px solid var(--line); border-bottom:0">
+              <label class="check">Max level <input id="hMaxLvl" inputmode="numeric" placeholder="any" style="width:60px;padding:3px 6px"></label>
+              <label class="check"><input type="checkbox" id="hSkipActive"> <span>Skip players online right now</span></label>
+              <label class="check"><input type="checkbox" id="hAuto" checked> <span>Auto-check statuses</span></label>
+              <button class="linkbtn" id="hClear" style="margin-left:auto;color:var(--neg)">Clear list</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>Your targets<span class="right" id="hListMeta"></span></h2>
+            <div class="chips" id="hChips"></div>
+            <div class="tablewrap">
+              <table class="data" id="hTable">
+                <thead><tr>
+                  <th>Player</th>
+                  <th class="num">Lvl</th>
+                  <th>Status</th>
+                  <th class="num">Timer</th>
+                  <th>Checked</th>
+                  <th class="num">Opened</th>
+                  <th></th>
+                </tr></thead>
+                <tbody id="hBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Gemensamt ---------- */
+
+const V1 = 'https://api.torn.com';
+const V2 = 'https://api.torn.com/v2';
+const STORE = 'tornApiKey';
+const CUSTOM = 'tornCustomValues';
+const LOCALE = 'en-GB';
+
+const $ = id => document.getElementById(id);
+const num = n => n.toLocaleString(LOCALE);
+const clock = d => d.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+const fmtDate = s => new Date(s * 1000).toLocaleDateString(LOCALE);
+
+let key = null;
+let inv = null;                  // senast hämtad data
+let sort = { key: 'roi', dir: -1 };
+let itemSort = { key: 'total', dir: -1 };
+let itemCat = null, itemsShowAll = false;
+let onlyAfford = false;
+
+function store(name, op, v) {
+  try {
+    if (op === 'get') return localStorage.getItem(name);
+    if (op === 'set') localStorage.setItem(name, v);
+    if (op === 'del') localStorage.removeItem(name);
+  } catch { return null; }
+}
+
+const ERRORS = {
+  2: 'Incorrect API key.',
+  5: 'Too many requests – wait a moment.',
+  10: 'The key owner is in federal jail.',
+  13: 'The key is disabled (owner inactive for more than 7 days).',
+  16: 'The key access level is too low. Use Limited or higher.',
+  18: 'The key is paused in Torn.',
+};
+class ApiError extends Error {
+  constructor(code, msg) { super(msg); this.code = code; }
+}
+const errText = e => e instanceof ApiError
+  ? (ERRORS[e.code] || `API error ${e.code}: ${e.message}`)
+  : 'Could not reach the Torn API.';
+
+async function api(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(`${url}${sep}comment=investments&key=${encodeURIComponent(key)}`);
+  const data = await res.json();
+  if (data.error) throw new ApiError(data.error.code, data.error.error);
+  return data;
+}
+
+function setStatus(text, isErr) {
+  const el = $('invStatus');
+  el.hidden = !text;
+  el.classList.toggle('error', !!isErr);
+  el.innerHTML = isErr ? '' : '<span class="spin"></span>';
+  el.append(text || '');
+}
+
+function money(n) {
+  if (n == null || !isFinite(n)) return '–';
+  const a = Math.abs(n), sign = n < 0 ? '-' : '';
+  if (a >= 1e9) return sign + '$' + (a / 1e9).toFixed(2) + 'b';
+  if (a >= 1e6) return sign + '$' + (a / 1e6).toFixed(1) + 'm';
+  if (a >= 1e3) return sign + '$' + (a / 1e3).toFixed(0) + 'k';
+  return sign + '$' + Math.round(a);
+}
+const pct = x => (x * 100).toFixed(2) + ' %';
+
+function parseMoney(s) {
+  s = String(s || '').trim().toLowerCase().replace(/[\s,$]/g, '');
+  if (!s) return null;
+  const m = s.match(/^([\d.]+)([kmb]?)$/);
+  if (!m) return null;
+  return parseFloat(m[1]) * ({ k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1);
+}
+
+function customValues() {
+  try { return JSON.parse(store(CUSTOM, 'get') || '{}'); } catch { return {}; }
+}
+
+/* ---------- Hämtning ---------- */
+
+// Pågående City Bank-investering, från v2 (/user/money) eller v1 (selections=money)
+function detectDeposit(v2, v1) {
+  const a = v2 && v2.city_bank;
+  if (a && a.amount > 0) {
+    const rate = a.duration && a.profit ? a.profit / a.amount * 365 / a.duration
+      : a.interest_rate ? a.interest_rate / 100 : null;
+    return { amount: a.amount, until: a.until || null, rate, profit: a.profit || null, duration: a.duration || null };
+  }
+  const b = v1 && v1.city_bank;
+  if (b && b.amount > 0) {
+    return { amount: b.amount, until: b.time_left ? Math.floor(Date.now() / 1000) + b.time_left : null, rate: null };
+  }
+  return null;
+}
+
+// Bank Interest-merits: +5 % ränta per nivå (procentsatsen läses från meritens beskrivning om den finns)
+function bankMeritBonus(userMerits, tornMerits) {
+  if (!userMerits || !tornMerits) return { bonus: 0, level: null };
+  const merit = tornMerits.find(m => /bank interest/i.test(m.name) || /bank interest/i.test(m.description));
+  if (!merit) return { bonus: 0, level: null };
+  const up = (userMerits.upgrades || []).find(u => u.id === merit.id);
+  const level = up ? up.level : 0;
+  const per = +((merit.description.match(/(\d+(?:\.\d+)?)\s*%/) || [])[1] || 5) / 100;
+  return { bonus: level * per, level };
+}
+
+// Inventory hämtas sida för sida (max 250 per anrop)
+async function fetchInventory() {
+  const all = [];
+  for (let offset = 0, page = 0; page < 40; page++, offset += 250) {
+    const r = await api(`${V2}/user/inventory?limit=250&offset=${offset}`);
+    const list = (r.inventory && r.inventory.items) || [];
+    all.push(...list);
+    if (list.length < 250) break;
+  }
+  return all;
+}
+
+async function fetchAll() {
+  setStatus('Fetching stocks, prices, bank rates, items and net worth…');
+  try {
+    const [stocks, mine, items, points, bank, cash, cashV1, networth, job, merits, tornMerits, inventory] = await Promise.all([
+      api(`${V2}/torn/stocks`),
+      api(`${V2}/user/stocks`),
+      api(`${V2}/torn/items`),
+      api(`${V2}/market/pointsmarket`).catch(() => null),
+      api(`${V2}/torn/bank`).catch(() => null),
+      api(`${V2}/user/money`).catch(() => null),
+      api(`${V1}/user/?selections=money`).catch(() => null),   // reserv för bankstatus
+      api(`${V2}/user/networth`).catch(() => null),
+      api(`${V2}/user/job`).catch(() => null),
+      api(`${V2}/user/merits`).catch(() => null),
+      api(`${V2}/torn/merits`).catch(() => null),
+      fetchInventory().catch(() => null),
+    ]);
+
+    const byName = new Map(), byId = new Map();
+    for (const it of items.items || []) {
+      const price = it.value && it.value.market_price > 0 ? it.value.market_price : 0;
+      byId.set(it.id, { name: it.name, type: it.type, price, image: it.image });
+      if (price) byName.set(it.name.toLowerCase(), price);
+    }
+    const pl = points && points.pointsmarket;
+    const pointPrice = pl && pl.length ? Math.min(...pl.map(l => l.cost)) : null;
+    const m = cash && cash.money;
+
+    inv = {
+      stocks: stocks.stocks || [],
+      mine: new Map((mine.stocks || []).map(s => [s.id, s])),
+      prices: { items: byName, point: pointPrice },
+      itemsById: byId,
+      bank: (bank && bank.bank) || [],
+      wallet: m ? m.wallet : cashV1 ? cashV1.money_onhand : null,
+      points: m ? m.points : cashV1 ? cashV1.points : null,
+      vault: m ? m.vault : null,
+      cayman: m ? m.cayman_bank : null,
+      deposit: detectDeposit(m, cashV1),
+      depositKnown: !!(m || (cashV1 && cashV1.city_bank)),
+      networth: networth && networth.networth,
+      job: job && job.job,
+      merit: bankMeritBonus(merits && merits.merits, tornMerits && tornMerits.merits),
+      inventory,
+      fetchedAt: new Date(),
+    };
+
+    if (!$('budget').value && inv.wallet != null) $('budget').value = money(inv.wallet).replace('$', '');
+    setStatus('');
+    render();
+  } catch (e) {
+    setStatus(errText(e), true);
+  }
+}
+
+/* ---------- Beräkningar ---------- */
+
+const BANK_MAX = 2e9;            // max insättning i City Bank
+const SELL_FEE = 0.001;          // 0,1 % avgift vid försäljning av aktier
+// Block n kräver requirement × 2^(n-1) nya aktier, alltså totalt requirement × (2^n − 1)
+const sharesFor = (n, req) => req * (2 ** n - 1);
+const blocksHeld = (shares, req) => Math.max(0, Math.floor(Math.log2(shares / req + 1) + 1e-9));
+
+// Man kan bara ha en City Bank-investering igång åt gången
+const BANK_MANUAL = 'tornBankBusy';
+let bankManual = store(BANK_MANUAL, 'get') === '1';   // hålls även i minnet om lagring är blockerad
+function bankState() {
+  const d = inv && inv.deposit;
+  return { busy: !!d || bankManual, deposit: d };
+}
+const topBankOf = () => (inv.bank.length ? inv.bank.reduce((a, b) => (b.rate > a.rate ? b : a)) : null);
+
+// Tolkar förmånens text, t.ex. "$50,000,000", "1x Drug Pack", "100 Points", "100 Energy"
+function benefitValue(desc, prices) {
+  const d = desc.trim();
+  let m = d.match(/^\$([\d,]+)/);
+  if (m) return { value: +m[1].replace(/,/g, ''), how: 'cash' };
+
+  m = d.match(/^([\d,]+)\s*points?\b/i);
+  if (m && prices.point) return { value: +m[1].replace(/,/g, '') * prices.point, how: 'points market' };
+
+  m = d.match(/^([\d,]+)\s*energy\b/i);
+  if (m && prices.items.get('xanax')) {
+    // En Xanax ger 250 energy – används som referenspris för energi
+    return { value: +m[1].replace(/,/g, '') / 250 * prices.items.get('xanax'), how: 'valued against Xanax' };
+  }
+
+  m = d.match(/^(\d+)\s*x\s+(.+)$/i);
+  const qty = m ? +m[1] : 1;
+  const name = (m ? m[2] : d).trim().toLowerCase();
+  const p = prices.items.get(name);
+  if (p) return { value: qty * p, how: 'item market' };
+  return null;
+}
+
+function payout(s, custom) {
+  if (s.bonus.passive) return null;
+  const auto = benefitValue(s.bonus.description, inv.prices);
+  if (auto) return auto;
+  return custom[s.acronym] != null ? { value: custom[s.acronym], how: null } : null;
+}
+
+// Bankräntebonus från en passiv förmån, t.ex. TCI "a 10% bank interest bonus"
+function bankBonus(s) {
+  if (!s.bonus.passive) return null;
+  const m = s.bonus.description.match(/(\d+(?:\.\d+)?)\s*%\s*bank interest/i);
+  return m ? +m[1] / 100 : null;
+}
+
+// Räntor: grundränta × (1 + merits + ev. TCI). Bonusarna antas adderas.
+function bankRates() {
+  const top = topBankOf();
+  const merit = inv.merit.bonus;
+  const tci = inv.stocks.find(s => bankBonus(s) != null);
+  const tciB = tci ? bankBonus(tci) : 0;
+  const tciShares = tci && inv.mine.get(tci.id) ? inv.mine.get(tci.id).shares : 0;
+  const tciHeld = !!tci && tciShares >= tci.bonus.requirement;
+  const d = inv.deposit;
+  // Grundräntan på en pågående insättning: dess faktiska ränta delat med de bonusar som gällde
+  const depositBase = d ? (d.rate != null ? d.rate / (1 + merit + (tciHeld ? tciB : 0)) : (top ? top.rate / 100 : 0)) : 0;
+  return { top, merit, tci, tciB, tciShares, tciHeld, depositBase };
+}
+
+// Nästa block för varje aktie samt bankalternativen
+function buildOptions() {
+  const custom = customValues();
+  const opts = [], passive = [];
+  const r = bankRates();
+  const d = inv.deposit;
+
+  for (const s of inv.stocks) {
+    const b = s.bonus;
+    const owned = inv.mine.get(s.id);
+    const shares = owned ? owned.shares : 0;
+
+    if (s === r.tci) {
+      // TCI: värdet är bonusen på bankräntan – på din pågående insättning, annars på en full insättning
+      if (r.tciHeld || !r.top) { passive.push(s); continue; }
+      const yearly = (d ? d.amount * r.depositBase : BANK_MAX * r.top.rate / 100) * r.tciB;
+      const cost = (b.requirement - shares) * s.market.price;
+      opts.push({
+        id: s.acronym, stock: s, name: `${s.acronym} – ${s.name}`,
+        desc: `+${Math.round(r.tciB * 100)} % bank interest on ${money(d ? d.amount : BANK_MAX)} in City Bank`,
+        block: 1, cost, value: yearly * r.top.days / 365, freq: r.top.days,
+        roi: cost > 0 ? yearly / cost : null,
+        breakEven: yearly > 0 ? cost / (yearly / 365) : null,
+      });
+      continue;
+    }
+    if (b.passive) { passive.push(s); continue; }
+
+    const inc = blocksHeld(shares, b.requirement);
+    const needed = Math.max(0, sharesFor(inc + 1, b.requirement) - shares);
+    const cost = needed * s.market.price;
+    const auto = benefitValue(b.description, inv.prices);
+    const customV = custom[s.acronym];
+    const value = auto ? auto.value : customV ?? null;
+
+    opts.push({
+      id: s.acronym, stock: s, name: `${s.acronym} – ${s.name}`,
+      desc: b.description + (auto ? ` · ${auto.how}` : ''),
+      block: inc + 1, cost, value, freq: b.frequency,
+      editable: !auto, customV,
+      roi: value != null && cost > 0 ? (value / b.frequency * 365) / cost : null,
+      breakEven: value ? cost / (value / b.frequency) : null,
+    });
+  }
+
+  for (const bk of inv.bank) {
+    const rate = bk.rate / 100 * (1 + r.merit + (r.tciHeld ? r.tciB : 0));
+    const extras = [r.merit ? `merits +${Math.round(r.merit * 100)} %` : '', r.tciHeld ? `TCI +${Math.round(r.tciB * 100)} %` : '']
+      .filter(Boolean).join(', ');
+    opts.push({
+      id: 'bank' + bk.days, name: `City Bank – ${bk.days} days`,
+      desc: `${bk.rate} % base` + (extras ? ` · ${extras}` : ''),
+      block: null, cost: null, value: null, freq: bk.days,
+      roi: rate, breakEven: null, bank: true,
+    });
+  }
+  return { opts, passive };
+}
+
+// Knapsack: välj antal block per aktie så att årsinkomsten blir maximal inom det fria kapitalet.
+// Pengar som blir över kan gå till banken till räntan `rate` (null = banken är upptagen).
+// Kapitalet delas upp i ~5000 enheter; kostnader avrundas uppåt så att planen alltid ryms.
+function solve(free, candidates, rate) {
+  const bankIncome = left => (rate != null ? Math.min(left, BANK_MAX) * rate : 0);
+  const U = Math.max(1e6, Math.ceil(free / 5000));
+  const cap = Math.max(0, Math.floor(free / U));
+  let dp = new Float64Array(cap + 1);
+  const choices = [];
+  for (const c of candidates) {
+    const req = c.s.bonus.requirement, price = c.s.market.price;
+    const weights = [];
+    for (let k = 1; k <= 30; k++) {
+      const w = Math.ceil(sharesFor(k, req) * price / U);
+      if (w > cap) break;
+      weights.push(w);
+    }
+    const next = Float64Array.from(dp), choice = new Uint8Array(cap + 1);
+    for (let x = 0; x <= cap; x++) {
+      for (let k = 1; k <= weights.length && weights[k - 1] <= x; k++) {
+        const v = dp[x - weights[k - 1]] + k * c.yearly;
+        if (v > next[x]) { next[x] = v; choice[x] = k; }
+      }
+    }
+    dp = next;
+    choices.push({ s: c.s, weights, choice });
+  }
+
+  let bestX = 0, total = -1;
+  for (let x = 0; x <= cap; x++) {
+    const v = dp[x] + bankIncome(free - x * U);
+    if (v > total) { total = v; bestX = x; }
+  }
+  const picked = new Map();
+  let spent = 0;
+  for (let i = choices.length - 1, x = bestX; i >= 0; i--) {
+    const { s, weights, choice } = choices[i];
+    const k = choice[x];
+    if (k) {
+      picked.set(s.id, k);
+      x -= weights[k - 1];
+      spent += sharesFor(k, s.bonus.requirement) * s.market.price;
+    }
+  }
+  const bankAmt = rate != null ? Math.max(0, Math.min(free - spent, BANK_MAX)) : 0;
+  return { total: Math.max(0, total), picked, spent, bankAmt };
+}
+
+// Nuvarande portfölj jämfört med optimal fördelning av samma kapital
+function analyzePortfolio(budget) {
+  const custom = customValues();
+  const r = bankRates();
+  const holdings = [], candidates = [];
+  let free = budget || 0, locked = 0, curIncome = 0;
+
+  for (const s of inv.stocks) {
+    const req = s.bonus.requirement, price = s.market.price;
+    const owned = inv.mine.get(s.id);
+    const shares = owned ? owned.shares : 0;
+    const p = payout(s, custom);
+    const yearly = p ? p.value * 365 / s.bonus.frequency : null;
+    const isTci = s === r.tci;
+
+    if (shares > 0) {
+      const n = blocksHeld(shares, req);
+      const value = shares * price;
+      const tx = owned.transactions || [];
+      const basis = tx.length ? tx.reduce((a, x) => a + x.shares * x.price, 0) : null;
+      const income = yearly != null ? n * yearly : null;
+      holdings.push({ s, shares, n, value, basis, income, roi: income != null ? income / value : null,
+                      excess: shares - sharesFor(n, req), known: !!p || isTci, tci: isTci, owned });
+      if (isTci) {
+        free += value;           // TCI:s värde räknas ut nedan, kapitalet kan flyttas
+      } else if (s.bonus.passive) {
+        // Passiva förmåner behålls; bara aktier utöver hela block räknas som fritt kapital
+        locked += sharesFor(n, req) * price;
+        free += (shares - sharesFor(n, req)) * price;
+      } else if (!p) {
+        locked += value;
+      } else {
+        free += value;
+        curIncome += income;
+      }
+    }
+    if (!isTci && yearly != null) candidates.push({ s, yearly });
+  }
+
+  // Pågående bankinsättning är låst till förfallodagen, och ingen ny kan göras under tiden
+  const bank = bankState();
+  const d = bank.deposit;
+  const multNo = 1 + r.merit, multTci = 1 + r.merit + r.tciB;
+  const lockedBase = d ? d.amount * r.depositBase : 0;
+  if (d) locked += d.amount;
+  curIncome += lockedBase * (r.tciHeld ? multTci : multNo);
+
+  const tciH = holdings.find(h => h.tci);
+  if (tciH) { tciH.income = r.tciHeld ? lockedBase * r.tciB : 0; tciH.roi = tciH.income / tciH.value; }
+
+  // Två scenarier: utan TCI, och med ett TCI-block (högre bankränta)
+  const base = !bank.busy && r.top ? r.top.rate / 100 : null;
+  const a = solve(free, candidates, base != null ? base * multNo : null);
+  let plan = { ...a, total: a.total + lockedBase * multNo, useTci: false, rate: base != null ? base * multNo : null };
+  if (r.tci) {
+    const tciCost = sharesFor(1, r.tci.bonus.requirement) * r.tci.market.price;
+    if (free >= tciCost) {
+      const b = solve(free - tciCost, candidates, base != null ? base * multTci : null);
+      const total = b.total + lockedBase * multTci;
+      if (total > plan.total) plan = { ...b, total, useTci: true, spent: b.spent + tciCost, rate: base != null ? base * multTci : null };
+    }
+  }
+  const { picked, bankAmt } = plan;
+  const rem = free - plan.spent - bankAmt;
+  const optIncome = plan.total;
+
+  // Jämför målinnehav med nuvarande innehav
+  const actions = [];
+  let sellTotal = 0;
+  for (const h of holdings) {
+    const req = h.s.bonus.requirement, price = h.s.market.price;
+    if (h.tci) {
+      h.target = plan.useTci ? req : 0;
+    } else if (h.s.bonus.passive) {
+      h.target = h.shares - h.excess;
+    } else if (!h.known) {
+      h.target = null;
+      actions.push({ kind: 'info', text: `Enter what ${h.s.acronym}'s benefit (${h.s.bonus.description}) is worth in the options table so it can be assessed.` });
+      continue;
+    } else {
+      h.target = sharesFor(picked.get(h.s.id) || 0, req);
+    }
+    const delta = h.target - h.shares;
+    if (delta < 0) {
+      sellTotal += -delta * price;
+      const why = h.target === 0 ? 'lower return than the alternatives'
+        : h.target === h.shares - h.excess ? 'surplus shares that give no benefit'
+        : 'the most expensive blocks return less than the alternatives';
+      actions.push({ kind: 'sell', text: `${num(-delta)} ${h.s.acronym} (≈ ${money(-delta * price)}) – ${why}.` });
+    }
+  }
+  if (plan.useTci && r.tciShares < r.tci.bonus.requirement) {
+    const delta = r.tci.bonus.requirement - r.tciShares;
+    actions.push({ kind: 'buy', text: `${num(delta)} ${r.tci.acronym} (≈ ${money(delta * r.tci.market.price)}) → +${Math.round(r.tciB * 100)} % interest on your City Bank investment.` });
+  }
+  for (const [id, k] of picked) {
+    const s = inv.stocks.find(x => x.id === id);
+    const owned = inv.mine.get(id);
+    const delta = sharesFor(k, s.bonus.requirement) - (owned ? owned.shares : 0);
+    if (delta > 0) {
+      actions.push({ kind: 'buy', text: `${num(delta)} ${s.acronym} (≈ ${money(delta * s.market.price)}) → ${k} block${k > 1 ? 's' : ''}, ${s.bonus.description} every ${s.bonus.frequency} days.` });
+    }
+  }
+  if (bankAmt > 0) {
+    actions.push({ kind: 'buy', text: `${money(bankAmt)} into City Bank for ${r.top.days} days (${(plan.rate * 100).toFixed(1)} % APR incl. bonuses).` });
+  }
+  if (d) {
+    actions.push({ kind: 'info', text: `Your City Bank investment of ${money(d.amount)} is locked until ${d.until ? fmtDate(d.until) : '?'}.` });
+  } else if (bank.busy) {
+    actions.push({ kind: 'info', text: 'You have a City Bank investment running, so no new bank deposit is suggested.' });
+  }
+  if (rem > 1e6) actions.push({ kind: 'info', text: `${money(rem)} is left over – not enough for anything else that pays a return.` });
+
+  return { holdings, actions, curIncome, optIncome, capital: free + locked, sellFee: sellTotal * SELL_FEE, bestRate: plan.rate };
+}
+
+/* ---------- Rendering: hjälpfunktioner ---------- */
+
+function el(tag, className, text) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text != null) e.textContent = text;
+  return e;
+}
+const cell = (text, className = '') => el('td', className, text);
+
+// Bild + namn + beskrivning för en aktie, ett item eller ett bankalternativ
+function nameCell(img, letter, title, sub) {
+  const td = el('td');
+  const wrap = el('div', 'stock');
+  if (img) {
+    const i = el('img');
+    i.src = img; i.alt = ''; i.loading = 'lazy';
+    i.onerror = () => i.replaceWith(el('span', 'ico', letter));
+    wrap.appendChild(i);
+  } else {
+    wrap.appendChild(el('span', 'ico', letter));
+  }
+  const txt = el('div');
+  txt.append(el('b', '', title));
+  if (sub) txt.append(el('small', '', sub));
+  wrap.appendChild(txt);
+  td.appendChild(wrap);
+  return td;
+}
+const stockCell = (s, title, sub) => nameCell(s && s.images && s.images.logo, s ? s.acronym[0] : '$', title, sub);
+
+function roiCell(roi, max) {
+  const td = el('td', 'num');
+  if (roi == null) { td.textContent = '–'; return td; }
+  const wrap = el('div', 'roi');
+  const bar = el('div', 'bar');
+  const fill = el('i');
+  fill.style.width = Math.max(4, Math.min(100, roi / max * 100)) + '%';
+  bar.appendChild(fill);
+  wrap.append(bar, el('span', '', pct(roi)));
+  td.appendChild(wrap);
+  return td;
+}
+
+function sortRows(rows, s, get) {
+  return rows.sort((a, b) => {
+    const x = get(a, s.key), y = get(b, s.key);
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return (x < y ? -1 : x > y ? 1 : 0) * s.dir;
+  });
+}
+function markSorted(selector, attr, s) {
+  document.querySelectorAll(selector).forEach(th => {
+    th.querySelector('.arrow')?.remove();
+    if (th.dataset[attr] === s.key) th.appendChild(el('span', 'arrow', s.dir > 0 ? '▲' : '▼'));
+  });
+}
+
+/* ---------- Rendering ---------- */
+
+function render() {
+  if (!inv) return;
+  const budget = parseMoney($('budget').value);
+  const a = analyzePortfolio(budget);
+  renderInfo();
+  renderNetworth();
+  renderSummary(a, budget);
+  renderPayouts();
+  renderPortfolio(a);
+  renderOptions(budget);
+  renderItems(a);
+}
+
+function renderInfo() {
+  const d = inv.deposit, nw = inv.networth;
+  $('iNetworth').textContent = nw ? money(nw.total) : '–';
+  $('iWallet').textContent = money(inv.wallet);
+  $('iBank').textContent = d ? `${money(d.amount)} until ${d.until ? fmtDate(d.until) : '?'}`
+    : inv.depositKnown ? 'None running' : 'Unknown';
+  $('iMerits').textContent = inv.merit.level == null ? '–' : `${inv.merit.level}/10 (+${Math.round(inv.merit.bonus * 100)} %)`;
+  $('iPoints').textContent = inv.points == null ? '–'
+    : num(inv.points) + (inv.prices.point ? ` ≈ ${money(inv.points * inv.prices.point)}` : '');
+  $('iPoint').textContent = money(inv.prices.point);
+  $('iUpdated').textContent = clock(inv.fetchedAt);
+  $('bankManual').checked = bankManual;
+  $('bankManualRow').hidden = !!d;
+}
+
+// Net worth uppdelad i grupper som i Torns egen networth-sammanställning
+function renderNetworth() {
+  const nw = inv.networth;
+  $('nwCard').hidden = !nw;
+  if (!nw) return;
+  const m = nw.money, it = nw.items, as = nw.assets;
+  const sum = o => Object.values(o).reduce((a, b) => a + (b || 0), 0);
+  const groups = [
+    ['Cash', m.wallet + m.vault + m.pending + m.bookie + m.piggy_bank, 'var(--c1)'],
+    ['Banks', m.city_bank + m.cayman_bank, 'var(--c2)'],
+    ['Stocks', as.stock_market, 'var(--c3)'],
+    ['Items', sum(it), 'var(--c4)'],
+    ['Property', as.property, 'var(--c5)'],
+    ['Points', nw.points, 'var(--c6)'],
+    ['Company', as.company, 'var(--c7)'],
+  ].filter(g => g[1] > 0);
+  const debts = -(Math.abs(m.loans || 0) + Math.abs(m.unpaid_fees || 0));
+  const pos = groups.reduce((s, g) => s + g[1], 0) || 1;
+
+  $('nwTotal').textContent = money(nw.total);
+  const stack = $('nwStack'), list = $('nwList');
+  stack.innerHTML = ''; list.innerHTML = '';
+  for (const [name, v, color] of groups.sort((a, b) => b[1] - a[1])) {
+    const seg = el('i');
+    seg.style.width = (v / pos * 100) + '%';
+    seg.style.background = color;
+    seg.title = `${name}: ${money(v)}`;
+    stack.appendChild(seg);
+    const li = el('li');
+    const dot = el('span', 'dot');
+    dot.style.background = color;
+    li.append(dot, el('span', '', name), el('b', '', money(v)), el('span', 'share', Math.round(v / pos * 100) + ' %'));
+    list.appendChild(li);
+  }
+  if (debts < 0) {
+    const li = el('li');
+    li.append(el('span'), el('span', '', 'Loans & fees'), el('b', 'neg', money(debts)), el('span', 'share', ''));
+    list.appendChild(li);
+  }
+  $('nwNote').textContent = `Torn's own net worth calculation, updated ${nw.timestamp ? new Date(nw.timestamp * 1000).toLocaleString(LOCALE) : '–'}.`;
+}
+
+function renderSummary(a, budget) {
+  $('planCard').hidden = false;
+  const diff = a.optIncome - a.curIncome;
+  const ratio = a.optIncome > 0 ? Math.min(1, a.curIncome / a.optIncome) : 1;
+  $('curIncome').textContent = `${money(a.curIncome)} / yr`;
+  $('curRoi').textContent = pct(a.capital ? a.curIncome / a.capital : 0);
+  $('optIncome').textContent = `${money(a.optIncome)} / yr`;
+  $('optRoi').textContent = pct(a.capital ? a.optIncome / a.capital : 0);
+  $('diffIncome').textContent = `${diff >= 0 ? '+' : ''}${money(diff)} / yr`;
+  $('diffIncome').className = 'num ' + (diff > 1 ? 'pos' : '');
+  $('diffMeta').textContent = a.sellFee > 0 && diff > 0
+    ? `fee ${money(a.sellFee)}, back in ${Math.max(1, Math.ceil(a.sellFee / (diff / 365)))} d` : '';
+  $('capital').textContent = money(a.capital);
+  $('passiveDay').textContent = `${money(a.curIncome / 365)} / day`;
+  $('passiveMonth').textContent = `${money(a.curIncome / 12)} / month`;
+
+  // Pengar som inte ger någon avkastning: plånbok, vault och Cayman (Cayman tar dessutom avgift)
+  const idle = (inv.wallet || 0) + (inv.vault || 0) + (inv.cayman || 0);
+  $('idleRow').hidden = !idle;
+  $('idleCash').textContent = money(idle);
+  $('idleMeta').textContent = a.bestRate != null
+    ? `≈ ${money(Math.min(idle, BANK_MAX) * a.bestRate)} / yr in City Bank`
+    : 'wallet, vault and Cayman';
+
+  $('effPct').textContent = Math.round(ratio * 100) + ' % of optimal';
+  $('effBar').className = 'bar ' + (ratio >= 0.95 ? '' : ratio >= 0.75 ? 'warn' : 'bad');
+  $('effBar').firstElementChild.style.width = (ratio * 100) + '%';
+  $('verdict').textContent = ratio >= 0.95 ? 'Well done – your allocation is close to optimal.'
+    : ratio >= 0.75 ? 'Not bad, but you could get more out of the same money.'
+    : 'You could earn considerably more from the same money by reallocating.';
+  $('verdict').className = 'verdict ' + (ratio >= 0.95 ? 'pos' : ratio >= 0.75 ? '' : 'neg');
+
+  const ul = $('planList');
+  ul.innerHTML = '';
+  const order = { sell: 0, buy: 1, info: 2 };
+  const acts = [...a.actions].sort((x, y) => order[x.kind] - order[y.kind]);
+  if (!acts.some(x => x.kind !== 'info')) acts.unshift({ kind: 'ok', text: 'No changes needed.' });
+  for (const x of acts) {
+    const li = el('li', x.kind === 'info' ? 'info' : '');
+    const [cls, label] = { sell: ['bad', 'Sell'], buy: ['ok', 'Buy'], info: ['', 'Info'], ok: ['ok', 'OK'] }[x.kind];
+    li.append(el('span', 'tag ' + cls, label), el('span', '', x.text));
+    ul.appendChild(li);
+  }
+}
+
+// Utdelningar: vilka aktier har en utbetalning redo, och när kommer nästa
+let jobWage = parseMoney(store('tornJobWage', 'get'));   // daglig lön, anges för hand
+
+function renderPayouts() {
+  const custom = customValues();
+  const rows = [];
+  let ready = 0, readyValue = 0;
+  for (const s of inv.stocks) {
+    const owned = inv.mine.get(s.id);
+    if (!owned || s.bonus.passive) continue;
+    const n = blocksHeld(owned.shares, s.bonus.requirement);
+    if (!n) continue;
+    const p = payout(s, custom);
+    const b = owned.bonus || {};
+    const left = b.frequency && b.progress != null ? Math.max(0, b.frequency - b.progress) : null;
+    if (b.available) { ready++; readyValue += p ? p.value * n : 0; }
+    rows.push({ s, n, value: p ? p.value * n : null, available: !!b.available, left });
+  }
+
+  const body = $('divBody');
+  body.innerHTML = '';
+  let yearTotal = 0, investTotal = 0;
+  for (const r of rows.sort((a, b) => (b.available - a.available) || ((a.left ?? 99) - (b.left ?? 99)))) {
+    const yearly = r.value != null ? r.value * 365 / r.s.bonus.frequency : null;
+    investTotal += yearly || 0;
+    const td = el('td');
+    td.appendChild(r.available ? el('span', 'tag ok', 'Ready to collect')
+      : el('span', 'muted', r.left != null ? (r.left === 0 ? 'Today' : `In ${r.left} day${r.left > 1 ? 's' : ''}`) : '–'));
+    const tr = el('tr', r.available ? 'best' : '');
+    tr.append(
+      stockCell(r.s, r.s.acronym, r.s.bonus.description),
+      cell(r.n, 'num'),
+      cell(money(r.value), 'num'),
+      cell(`${r.s.bonus.frequency} d`, 'num'),
+      cell(money(yearly), 'num'),
+      td,
+    );
+    body.appendChild(tr);
+  }
+
+  // City Bank: räntan betalas ut när investeringen förfaller (inklusive merits och ev. TCI-bonus)
+  const d = inv.deposit;
+  if (d) {
+    const r = bankRates();
+    const rate = d.rate != null ? d.rate : r.depositBase * (1 + r.merit + (r.tciHeld ? r.tciB : 0));
+    const yearly = d.amount * rate;
+    const days = d.duration || (d.until ? Math.max(1, Math.round((d.until - nowS()) / 86400)) : null);
+    const profit = d.profit || (days ? yearly * days / 365 : null);
+    investTotal += yearly;
+    const st = el('td');
+    st.appendChild(d.until ? el('span', 'muted', `Matures ${fmtDate(d.until)}`) : el('span', 'muted', 'Running'));
+    const tr = el('tr');
+    tr.append(
+      nameCell(null, '$', 'City Bank', `${money(d.amount)} at ${pct(rate)} APR`),
+      cell('–', 'num'),
+      cell(money(profit), 'num'),
+      cell(days ? `${days} d` : '–', 'num'),
+      cell(money(yearly), 'num'),
+      st,
+    );
+    body.appendChild(tr);
+  }
+
+  // Jobb: lönen finns inte i API:t, så den anges för hand och sparas
+  const job = inv.job;
+  const wage = jobWage;
+  const wageYear = wage ? wage * 365 : 0;
+  if (job) {
+    const title = job.type === 'company' ? job.name : `${job.name} (city job)`;
+    const inp = el('input');
+    inp.placeholder = 'Daily wage';
+    inp.value = wage ? money(wage).replace('$', '') : '';
+    inp.onchange = () => {
+      jobWage = parseMoney(inp.value);
+      if (jobWage == null) store('tornJobWage', 'del'); else store('tornJobWage', 'set', String(jobWage));
+      render();
+    };
+    const payTd = el('td', 'num');
+    payTd.appendChild(inp);
+    const tr = el('tr');
+    tr.append(
+      nameCell(null, 'J', title, `${job.position}${job.days_in_company != null ? ` · ${num(job.days_in_company)} days` : ''}`),
+      cell('–', 'num'), payTd, cell('1 d', 'num'), cell(wage ? money(wageYear) : '–', 'num'),
+      cell('Paid daily', 'muted'),
+    );
+    body.appendChild(tr);
+  }
+
+  yearTotal = investTotal + wageYear;
+  $('divCard').hidden = !rows.length && !d && !job;
+  const readyTxt = ready ? `${ready} ready to collect${readyValue ? ' · ' + money(readyValue) : ''} · ` : '';
+  $('divSum').textContent = `${readyTxt}${money(yearTotal)} / yr`;
+
+  const foot = $('divFoot');
+  foot.innerHTML = '';
+  const sum = (label, v, sub, cls) => {
+    const tr = el('tr', cls);
+    const name = el('td'); name.colSpan = 4;
+    name.append(el('b', '', label), sub ? el('small', 'muted', ' ' + sub) : '');
+    tr.append(name, cell(money(v), 'num'), cell(`${money(v / 365)} / day`, 'muted'));
+    foot.appendChild(tr);
+  };
+  if (wageYear) sum('Investments', investTotal, '(matches “Your return now”)', 'sub');
+  sum('Total income', yearTotal, `· ${money(yearTotal / 12)} / month`, 'total');
+}
+
+function renderPortfolio(a) {
+  $('portCard').hidden = !a.holdings.length;
+  $('portTotal').textContent = money(a.holdings.reduce((s, h) => s + h.value, 0));
+  const body = $('portBody');
+  body.innerHTML = '';
+  for (const h of [...a.holdings].sort((x, y) => y.value - x.value)) {
+    let tag;
+    if (h.tci) tag = h.target === 0 ? ['bad', 'Sell'] : h.shares > h.target ? ['warn', 'Sell some'] : h.shares < h.target ? ['info', 'Buy more'] : ['ok', 'Optimal'];
+    else if (h.s.bonus.passive) tag = h.excess > 0 ? ['warn', 'Surplus'] : ['', 'Passive'];
+    else if (!h.known) tag = ['warn', 'Enter value'];
+    else if (h.target === h.shares) tag = ['ok', 'Optimal'];
+    else if (h.target === 0) tag = ['bad', 'Sell'];
+    else if (h.target < h.shares) tag = ['warn', 'Sell some'];
+    else tag = ['info', 'Buy more'];
+
+    const pl = h.basis != null ? h.value - h.basis : null;
+    const td = el('td');
+    td.appendChild(el('span', 'tag ' + tag[0], tag[1]));
+    const tr = el('tr');
+    tr.append(
+      stockCell(h.s, h.s.acronym, h.s.bonus.description),
+      cell(num(h.shares), 'num'),
+      cell(h.n + (h.excess > 0 ? ' +' : ''), 'num'),
+      cell(money(h.value), 'num'),
+      cell(pl == null ? '–' : (pl >= 0 ? '+' : '') + money(pl), 'num ' + (pl == null ? '' : pl >= 0 ? 'pos' : 'neg')),
+      cell(h.income != null ? money(h.income) : '–', 'num'),
+      cell(h.roi != null ? pct(h.roi) : '–', 'num'),
+      td,
+    );
+    body.appendChild(tr);
+  }
+}
+
+function renderOptions(budget) {
+  let { opts, passive } = buildOptions();
+  // Man kan bara ha en City Bank-investering igång åt gången: ersätt bankraderna med en rad som säger det
+  const bank = bankState();
+  if (bank.busy) {
+    opts = opts.filter(o => !o.bank);
+    const until = bank.deposit && bank.deposit.until;
+    opts.push({ id: 'bankBusy', name: 'City Bank', busy: true, bank: true,
+                desc: `Unavailable – you already have an investment running${until ? ' until ' + fmtDate(until) : ''} (only one at a time)`,
+                block: null, cost: null, value: null, freq: null, roi: null, breakEven: null });
+  }
+  const affordable = o => (o.bank ? !o.busy : budget == null || o.cost <= budget);
+
+  // Bästa nästa köp (alltid efter ROI, oberoende av vald sortering)
+  const byRoi = [...opts].sort((a, b) => (b.roi ?? -1) - (a.roi ?? -1));
+  const best = byRoi.find(o => o.roi != null && affordable(o) && (!o.bank || (budget ?? 0) > 0));
+  $('bestName').textContent = best ? best.name : 'Nothing within spare cash';
+  $('bestMeta').textContent = !best ? ''
+    : pct(best.roi) + ' · ' + (best.bank ? `${best.freq}-day term` : `${money(best.cost)}, every ${best.freq} d`);
+
+  sortRows(opts, sort, (o, k) => (k === 'name' ? o.name.toLowerCase() : o[k]));
+  markSorted('#optTable th[data-sort]', 'sort', sort);
+
+  const maxRoi = Math.max(0.0001, ...opts.map(o => o.roi || 0));
+  const body = $('invBody');
+  body.innerHTML = '';
+  let shown = 0;
+  for (const o of opts) {
+    if (onlyAfford && !affordable(o)) continue;
+    shown++;
+    const tr = el('tr', o === best ? 'best' : affordable(o) ? '' : 'dim');
+
+    const valTd = cell('', 'num');
+    if (o.editable) {
+      const inp = el('input');
+      inp.placeholder = 'Enter value';
+      inp.value = o.customV != null ? money(o.customV).replace('$', '') : '';
+      inp.onchange = () => {
+        const c = customValues(), v = parseMoney(inp.value);
+        if (v == null) delete c[o.id]; else c[o.id] = v;
+        store(CUSTOM, 'set', JSON.stringify(c));
+        render();
+      };
+      valTd.appendChild(inp);
+    } else {
+      valTd.textContent = o.bank ? '–' : money(o.value);
+    }
+
+    tr.append(
+      stockCell(o.stock || null, o.name, o.desc),
+      cell(o.block ?? '–', 'num'),
+      cell(o.bank ? '–' : money(o.cost), 'num'),
+      valTd,
+      cell(o.freq ? `${o.freq} d` : '–', 'num'),
+      roiCell(o.roi, maxRoi),
+      cell(o.breakEven ? `${num(Math.round(o.breakEven))} d` : '–', 'num'),
+    );
+    body.appendChild(tr);
+  }
+  if (!shown) {
+    const td = cell('No options within your spare cash.', 'muted');
+    td.colSpan = 7;
+    body.appendChild(el('tr')).appendChild(td);
+  }
+
+  const ul = $('passiveList');
+  ul.innerHTML = '';
+  for (const s of passive) {
+    const li = el('li');
+    const td = stockCell(s, `${s.acronym} – ${s.name}`,
+      `${s.bonus.description} – ${num(s.bonus.requirement)} shares ≈ ${money(s.bonus.requirement * s.market.price)}`);
+    li.appendChild(td.firstElementChild);
+    ul.appendChild(li);
+  }
+}
+
+// Items: inventoryt värderat till marknadspris, grupperat per kategori
+function renderItems(a) {
+  const list = inv.inventory;
+  $('itemCard').hidden = !list;
+  if (!list) return;
+
+  // Slå ihop rader med samma item (t.ex. flera vapen av samma sort)
+  const merged = new Map();
+  for (const x of list) {
+    if (x.faction_owned) continue;
+    const info = inv.itemsById.get(x.id) || { name: x.name, type: 'Other', price: 0 };
+    const k = x.id + (x.equipped ? ':eq' : '');
+    const row = merged.get(k) || { id: x.id, name: info.name || x.name, type: info.type || 'Other', price: info.price,
+                                   image: info.image, amount: 0, equipped: x.equipped };
+    row.amount += x.amount;
+    merged.set(k, row);
+  }
+  const rows = [...merged.values()].map(r => ({ ...r, total: r.amount * r.price }));
+  const total = rows.reduce((s, r) => s + r.total, 0);
+  const equipped = rows.filter(r => r.equipped).reduce((s, r) => s + r.total, 0);
+  const sellable = total - equipped;
+
+  $('itemTotal').textContent = money(total);
+  $('itValue').textContent = money(total);
+  $('itSellable').textContent = money(sellable);
+  $('itEquipped').textContent = money(equipped);
+  // Vad det sålda värdet skulle ge till samma avkastning som din optimala fördelning
+  const optRoi = a.capital ? a.optIncome / a.capital : 0;
+  $('itCouldEarn').textContent = optRoi > 0 ? `${money(sellable * optRoi)} / yr` : '–';
+
+  // Kategorier
+  const cats = new Map();
+  for (const r of rows) cats.set(r.type, (cats.get(r.type) || 0) + r.total);
+  const chips = $('itChips');
+  chips.innerHTML = '';
+  const mk = (label, cat) => {
+    const b = el('button', 'chip' + (itemCat === cat ? ' on' : ''), label);
+    b.onclick = () => { itemCat = cat; itemsShowAll = false; render(); };
+    chips.appendChild(b);
+  };
+  mk(`All · ${money(total)}`, null);
+  for (const [c, v] of [...cats].sort((x, y) => y[1] - x[1])) mk(`${c} · ${money(v)}`, c);
+
+  let shown = rows.filter(r => !itemCat || r.type === itemCat);
+  sortRows(shown, itemSort, (r, k) => (k === 'name' || k === 'type' ? String(r[k]).toLowerCase() : r[k]));
+  markSorted('#itemTable th[data-isort]', 'isort', itemSort);
+  const limit = itemsShowAll ? shown.length : 25;
+
+  const body = $('itemBody');
+  body.innerHTML = '';
+  for (const r of shown.slice(0, limit)) {
+    const tr = el('tr', r.price ? '' : 'dim');
+    const img = `https://www.torn.com/images/items/${r.id}/small.png`;
+    tr.append(
+      nameCell(img, r.name[0], r.name, r.equipped ? 'Equipped' : null),
+      cell(r.type),
+      cell(num(r.amount), 'num'),
+      cell(r.price ? money(r.price) : 'not tradable', 'num'),
+      cell(r.price ? money(r.total) : '–', 'num'),
+    );
+    body.appendChild(tr);
+  }
+  const note = $('itemNote');
+  note.innerHTML = '';
+  if (shown.length > limit) {
+    const btn = el('button', 'linkbtn', `Show all ${shown.length} items`);
+    btn.onclick = () => { itemsShowAll = true; render(); };
+    note.append(`Showing the ${limit} most valuable of ${shown.length}. `, btn);
+  } else {
+    note.textContent = `${shown.length} item${shown.length === 1 ? '' : 's'}. Faction-owned items are not included.`;
+  }
+}
+
+/* ---------- Mål: gemensamma hjälpfunktioner ---------- */
+
+const attackUrl = id => `https://www.torn.com/page.php?sid=attack&user2ID=${id}`;
+const profileUrl = id => `https://www.torn.com/profiles.php?XID=${id}`;
+const nowS = () => Date.now() / 1000;
+
+function fmtLeft(sec) {
+  if (sec == null) return '–';
+  sec = Math.max(0, Math.round(sec));
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const p = n => String(n).padStart(2, '0');
+  if (d) return `${d}d ${p(h)}:${p(m)}:${p(s)}`;
+  return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
+}
+
+// Statusgrupp för färg och sortering
+function stateGroup(st) {
+  switch (st && st.state) {
+    case 'Okay': return { cls: 'okay', order: 0 };
+    case 'Hospital': return { cls: 'hospital', order: 1 };
+    case 'Traveling': case 'Abroad': return { cls: 'travel', order: 2 };
+    case 'Jail': case 'Federal': return { cls: 'jail', order: 3 };
+    default: return { cls: 'gone', order: 4 };
+  }
+}
+
+// Text med nedräkning som uppdateras varje sekund av tickHw()
+function timerEl(until, done = '–') {
+  const s = el('span', 'timer');
+  if (until) { s.dataset.until = until; s.dataset.done = done; s.textContent = fmtLeft(until - nowS()); }
+  else s.textContent = done;
+  return s;
+}
+
+// När blir en spelare attackerbar? Okay = nu, sjukhus/fängelse = när tiden går ut,
+// på väg hem till Torn = när planet landar. Utomlands, på väg bort eller i federal = inte alls.
+function availableAt(m) {
+  const st = m.status || {};
+  if (st.state === 'Okay') return 0;
+  if ((st.state === 'Hospital' || st.state === 'Jail') && st.until) return st.until;
+  if (st.state === 'Traveling' && /returning|to torn/i.test(st.description || '') && st.until) return st.until;
+  return Infinity;
+}
+
+/* ---------- Halloween (Trick or Treat) ---------- */
+
+// Varje attack man själv startar kan ge en treat, så målet är många snabba attacker mot lätta mål.
+const H_STORE = 'tornHwTargets';
+const H_POLL = 15_000;           // statuskontroll: ≈ 12 spelare + factions + energi + attacklogg per gång (< 80 anrop/min)
+const H_BATCH = 12;
+const H_RECHECK = 20;            // sekunder efter en attack innan målets nya status kontrolleras
+const ATTACK_ENERGY = 25;
+
+const H = {
+  targets: (() => { try { return JSON.parse(store(H_STORE, 'get') || '[]'); } catch { return []; } })(),
+  live: new Map(),               // id -> { status, last_action, level, name, checked }
+  opened: new Map(),             // id -> antal attacker öppnade denna session
+  attackedAt: new Map(),         // id -> när attacksidan senast öppnades
+  openedTotal: 0, sessionStart: Date.now(), wonStart: null, won: null,
+  bars: null, cds: null, at: 0, timer: null, busy: false, filter: 'all', nextKey: null,
+};
+const hSave = () => store(H_STORE, 'set', JSON.stringify(H.targets.map(({ id, name, level, fid }) => ({ id, name, level, fid }))));
+
+function setHwStatus(text, isErr) {
+  const e = $('hStatus');
+  e.hidden = !text;
+  e.classList.toggle('error', !!isErr);
+  e.textContent = text || '';
+}
+
+function addTargets(list, { quiet = false, refresh = true } = {}) {
+  const have = new Set(H.targets.map(t => t.id));
+  let added = 0;
+  for (const t of list) {
+    if (!t.id || have.has(t.id)) continue;
+    have.add(t.id);
+    H.targets.push({ id: t.id, name: t.name || null, level: t.level || null, fid: t.fid || null });
+    if (t.status) H.live.set(t.id, { status: t.status, last_action: t.last_action, level: t.level, name: t.name, checked: nowS() });
+    added++;
+  }
+  hSave();
+  if (!quiet || added) {
+    setHwStatus(added ? `Added ${added} target${added > 1 ? 's' : ''}.` : 'No new targets – they are already in the list.');
+    setTimeout(() => setHwStatus(''), 3000);
+  }
+  H.nextKey = null;
+  renderHw();
+  if (added && refresh) hRefresh();
+  return added;
+}
+
+// Spelare du har besegrat, från Torns attacklogg (/user/attacks, utgående). Fungerar även för anonyma attacker.
+const WINS = new Set(['Attacked', 'Mugged', 'Hospitalized', 'Looted', 'Arrested', 'Special', 'Bounty']);
+async function defeatedSince(from) {
+  const found = new Map();
+  let to = null, newest = from;
+  for (let page = 0; page < 10; page++) {   // max 1 000 attacker per import
+    const r = await api(`${V2}/user/attacks?filters=outgoing&limit=100&sort=DESC&from=${from}${to ? `&to=${to}` : ''}`);
+    const list = r.attacks || [];
+    for (const a of list) {
+      newest = Math.max(newest, a.started);
+      if (!WINS.has(a.result) || !a.defender || found.has(a.defender.id)) continue;
+      found.set(a.defender.id, { id: a.defender.id, name: a.defender.name, level: a.defender.level });
+    }
+    if (list.length < 100) break;
+    to = Math.min(...list.map(a => a.started)) - 1;
+  }
+  return { players: [...found.values()], newest };
+}
+
+async function hImportAttacks() {
+  const hours = +$('hAtkRange').value || 24;
+  const btn = $('hAtkBtn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const { players } = await defeatedSince(Math.floor(nowS() - hours * 3600));
+    if (!players.length) setHwStatus(`You have not defeated anyone in the last ${hours} hours.`);
+    else addTargets(players);
+  } catch (e) {
+    setHwStatus(errText(e), true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Import from my attacks';
+  }
+}
+
+// Auto-läge: vid varje statuskontroll läggs nya spelare du besegrat sedan förra kontrollen till
+let hAtkAuto = store('tornHwAtkAuto', 'get') === '1';
+let hAtkSince = +store('tornHwAtkSince', 'get') || 0;
+async function hAutoImport() {
+  if (!hAtkAuto) return;
+  if (!hAtkSince) hAtkSince = Math.floor(nowS());
+  try {
+    const { players, newest } = await defeatedSince(hAtkSince);
+    hAtkSince = newest + 1;
+    store('tornHwAtkSince', 'set', String(hAtkSince));
+    if (players.length) addTargets(players, { quiet: true, refresh: false });
+  } catch { /* försöker igen vid nästa kontroll */ }
+}
+
+// Hämtar status för målen. Factions hämtas med ett anrop för alla medlemmar, övriga spelare några i taget.
+async function hRefresh(all = false) {
+  if (!key || H.busy) return;
+  H.busy = true;
+  try {
+    await hAutoImport();
+    const now = nowS();
+    const [bars, cds, ps, comp] = await Promise.all([
+      api(`${V2}/user/bars`).catch(() => null),
+      api(`${V2}/user/cooldowns`).catch(() => null),
+      api(`${V2}/user/personalstats?stat=attackswon`).catch(() => null),
+      api(`${V2}/user/competition`).catch(() => null),   // treats och basket under Halloween
+    ]);
+    H.at = now;
+    H.bars = bars && bars.bars;
+    H.cds = cds && cds.cooldowns;
+    const won = ps && Array.isArray(ps.personalstats) ? (ps.personalstats.find(x => x.name === 'attackswon') || {}).value : null;
+    if (won != null) { if (H.wonStart == null) H.wonStart = won; H.won = won; }
+    const c = comp && comp.competition;
+    H.comp = c && c.name === 'Halloween' ? c : null;
+    if (H.comp && H.treatsStart == null) H.treatsStart = H.comp.treats_collected;
+
+    const fids = [...new Set(H.targets.filter(t => t.fid).map(t => t.fid))];
+    const failed = new Set();
+    await Promise.all(fids.map(async fid => {
+      try {
+        const r = await api(`${V2}/faction/${fid}/members`);
+        for (const m of r.members || []) {
+          if (H.targets.some(t => t.id === m.id)) {
+            H.live.set(m.id, { status: m.status, last_action: m.last_action, level: m.level, name: m.name, checked: nowS() });
+          }
+        }
+      } catch { failed.add(fid); }
+    }));
+
+    // Enskilda spelare: aldrig kontrollerade först, sedan nyss attackerade, sedan de som kontrollerades längst sedan
+    const due = H.targets.filter(t => !t.fid || failed.has(t.fid)).map(t => {
+      const l = H.live.get(t.id), att = H.attackedAt.get(t.id);
+      const pri = !l ? 0 : att && att > l.checked && now - att > H_RECHECK ? 1 : 2;
+      return { t, pri, checked: l ? l.checked : 0 };
+    }).sort((a, b) => a.pri - b.pri || a.checked - b.checked)
+      .slice(0, all ? 40 : H_BATCH);
+    await Promise.all(due.map(async ({ t }) => {
+      try {
+        const r = await api(`${V2}/user/${t.id}/profile`);
+        const p = r.profile;
+        H.live.set(t.id, { status: p.status, last_action: p.last_action, level: p.level, name: p.name, checked: nowS() });
+      } catch { /* försöker igen vid nästa kontroll */ }
+    }));
+
+    // Spara namn och nivå så att listan ser bra ut även innan nästa kontroll
+    for (const t of H.targets) {
+      const l = H.live.get(t.id);
+      if (l) { t.name = l.name || t.name; t.level = l.level || t.level; }
+    }
+    hSave();
+    if ($('hStatus').classList.contains('error')) setHwStatus('');
+  } catch (e) {
+    setHwStatus(errText(e), true);
+  } finally {
+    H.busy = false;
+    H.nextKey = null;
+    renderHw();
+  }
+}
+
+function hSetPolling() {
+  clearInterval(H.timer);
+  H.timer = null;
+  if (!$('tab-hw').hidden && $('hAuto').checked) H.timer = setInterval(hRefresh, H_POLL);
+}
+
+const hMaxLvl = () => parseInt($('hMaxLvl').value, 10) || null;
+
+// När blir målet attackerbart? Som i War, men ett nyss attackerat mål räknas som upptaget tills det kontrollerats igen.
+function hAvailableAt(t) {
+  const l = H.live.get(t.id);
+  if (!l) return { at: Infinity, why: 'unchecked' };
+  const att = H.attackedAt.get(t.id);
+  if (att && att > l.checked) return { at: Infinity, why: 'attacked' };
+  const max = hMaxLvl();
+  if (max && l.level > max) return { at: Infinity, why: 'level' };
+  if ($('hSkipActive').checked && l.last_action && l.last_action.status === 'Online') return { at: Infinity, why: 'online' };
+  return { at: availableAt(l), why: null };
+}
+
+function hQueue() {
+  const now = nowS();
+  return H.targets.map((t, i) => ({ t, i, ...hAvailableAt(t) }))
+    .sort((a, b) => {
+      const x = a.at <= now ? 0 : a.at, y = b.at <= now ? 0 : b.at;
+      if (x !== y) return x - y;
+      // Bland tillgängliga: den som attackerats minst och längst sedan först
+      return (H.attackedAt.get(a.t.id) || 0) - (H.attackedAt.get(b.t.id) || 0) || a.i - b.i;
+    });
+}
+
+function hAttack(t) {
+  H.attackedAt.set(t.id, nowS());
+  H.opened.set(t.id, (H.opened.get(t.id) || 0) + 1);
+  H.openedTotal++;
+  H.nextKey = null;
+  renderHw();
+}
+
+function hAttackLink(t, cls, text) {
+  const a = el('a', cls, text);
+  a.href = attackUrl(t.id);
+  a.target = 'torn-attack';
+  a.rel = 'noopener';
+  a.onclick = () => hAttack(t);
+  return a;
+}
+
+function hRenderNext() {
+  const q = hQueue();
+  const now = nowS();
+  const ready = q.filter(x => x.at <= now);
+  const k = q.slice(0, 2).map(x => `${x.t.id}:${x.at <= now ? 'now' : x.at}`).join('|') + `#${ready.length}/${q.length}`;
+  if (k === H.nextKey) return;
+  H.nextKey = k;
+
+  $('hNextCount').textContent = q.length ? `${ready.length} of ${q.length} available` : '';
+  const body = $('hNextBody'), then = $('hThenBody');
+  body.innerHTML = ''; then.innerHTML = '';
+  then.hidden = q.length < 2;
+  if (!q.length) {
+    body.append(el('div', 'empty', 'Add targets below – player IDs, profile links or a whole faction.'));
+    return;
+  }
+  const first = q[0], l = H.live.get(first.t.id);
+  const who = el('div', 'who');
+  const a = el('a', '', l ? l.name : first.t.name || `#${first.t.id}`);
+  a.href = profileUrl(first.t.id); a.target = '_blank'; a.rel = 'noopener';
+  const b = el('b');
+  b.append(el('span', 'ldot ' + (l && l.last_action ? l.last_action.status : '')), a);
+  const sub = el('small', 'muted');
+  if (l) sub.append(el('span', 'st ' + stateGroup(l.status).cls, l.status.state), ` · Lvl ${l.level} · [${first.t.id}]`);
+  else sub.append(`[${first.t.id}] · checking…`);
+  who.append(b, sub);
+
+  const reason = { unchecked: 'Checking…', attacked: 'Re-checking…', level: 'Above max level', online: 'Online – skipped' };
+  const timer = first.at === Infinity ? el('div', 'big muted', reason[first.why] || 'Unavailable')
+    : first.at <= now ? el('div', 'big now', 'Available now')
+    : (() => { const d = el('div', 'big'); d.appendChild(timerEl(first.at, 'Available now')); return d; })();
+  body.append(who, timer, hAttackLink(first.t, 'btn' + (first.at <= now ? '' : ' off'), 'Attack'));
+
+  if (q[1]) {
+    const n = q[1], nl = H.live.get(n.t.id);
+    const na = el('a', '', nl ? nl.name : n.t.name || `#${n.t.id}`);
+    na.href = profileUrl(n.t.id); na.target = '_blank'; na.rel = 'noopener';
+    then.append(el('span', 'lbl', 'Then'), na);
+    if (nl) then.append(el('span', 'st ' + stateGroup(nl.status).cls, nl.status.state));
+    then.append(n.at === Infinity ? el('span', 'timer muted', reason[n.why] || 'unavailable')
+      : n.at <= now ? el('span', 'timer pos', 'available now')
+      : timerEl(n.at, 'available now'));
+  }
+}
+
+const H_FILTERS = [
+  ['all', 'All', () => true],
+  ['ready', 'Available', x => x.at <= nowS()],
+  ['hospital', 'Hospital', x => { const l = H.live.get(x.t.id); return l && l.status.state === 'Hospital'; }],
+  ['away', 'Away / jail', x => { const l = H.live.get(x.t.id); return l && ['Traveling', 'Abroad', 'Jail', 'Federal'].includes(l.status.state); }],
+  ['unchecked', 'Unchecked', x => !H.live.get(x.t.id)],
+];
+
+function renderHw() {
+  if ($('tab-hw').hidden) return;
+  H.nextKey = null;
+  hRenderNext();
+
+  // Energi: en attack kostar 25 energi
+  const e = H.bars && H.bars.energy;
+  if (e) {
+    $('hEnergy').textContent = `${num(e.current)} / ${num(e.maximum)}`;
+    $('hAttacksLeft').textContent = num(Math.floor(e.current / ATTACK_ENERGY));
+    $('hLowEnergy').hidden = e.current >= ATTACK_ENERGY;
+    $('hEnergyBar').firstElementChild.style.width = Math.min(100, e.current / e.maximum * 100) + '%';
+    $('hTick').innerHTML = ''; $('hTick').append(e.tick_time ? timerEl(H.at + e.tick_time, 'now') : '–');
+    $('hFull').innerHTML = ''; $('hFull').append(e.full_time ? timerEl(H.at + e.full_time, 'Full') : el('span', 'pos', 'Full'));
+  }
+  for (const [k, id] of [['drug', 'hDrug'], ['booster', 'hBooster']]) {
+    const s = H.cds ? H.cds[k] : null;
+    $(id).innerHTML = '';
+    $(id).append(s ? timerEl(H.at + s, 'Ready') : el('span', 'pos', s === 0 ? 'Ready' : '–'));
+  }
+
+  // Session
+  $('hOpened').textContent = num(H.openedTotal);
+  const wonNow = H.won != null && H.wonStart != null ? H.won - H.wonStart : null;
+  $('hWon').textContent = wonNow == null ? '–' : num(wonNow);
+  const hours = (Date.now() - H.sessionStart) / 3.6e6;
+  $('hPace').textContent = hours > 0.02 ? `${Math.round((wonNow ?? H.openedTotal) / hours)} / hr` : '–';
+
+  $('hTreatsTile').textContent = H.comp && H.treatsStart != null ? num(H.comp.treats_collected - H.treatsStart) : '–';
+
+  // Mållistan
+  const q = hQueue();
+  const chips = $('hChips');
+  chips.innerHTML = '';
+  for (const [k, label, fn] of H_FILTERS) {
+    const b = el('button', 'chip' + (H.filter === k ? ' on' : ''), `${label} · ${q.filter(fn).length}`);
+    b.onclick = () => { H.filter = k; renderHw(); };
+    chips.appendChild(b);
+  }
+  $('hListMeta').textContent = `${H.targets.length} targets`;
+  const body = $('hBody');
+  body.innerHTML = '';
+  const max = hMaxLvl();
+  for (const x of q.filter(H_FILTERS.find(f => f[0] === H.filter)[2])) {
+    const t = x.t, l = H.live.get(t.id);
+    const tr = el('tr', x.at <= nowS() ? '' : 'dim');
+    const nameCell = el('td');
+    const a = el('a', '', (l && l.name) || t.name || `#${t.id}`);
+    a.href = profileUrl(t.id); a.target = '_blank'; a.rel = 'noopener';
+    const b = el('b');
+    b.append(el('span', 'ldot ' + (l && l.last_action ? l.last_action.status : '')), a);
+    nameCell.append(b, el('small', 'muted', ` [${t.id}]${l && l.last_action ? ' · ' + l.last_action.relative : ''}`));
+    const st = el('td');
+    if (l) st.append(el('span', 'st ' + stateGroup(l.status).cls, l.status.state));
+    else st.append(el('span', 'muted', 'Unchecked'));
+    if (x.why === 'attacked') st.append(el('small', 'muted', ' · attacked, re-checking'));
+    const tm = el('td', 'num');
+    tm.appendChild(timerEl(l && l.status.until > nowS() ? l.status.until : null, '–'));
+    const ck = el('td', 'muted');
+    if (l) { ck.dataset.checked = l.checked; ck.textContent = ago(l.checked); } else ck.textContent = '–';
+    const act = el('td', 'num');
+    const rm = el('button', 'xbtn', '×');
+    rm.title = 'Remove from list';
+    rm.onclick = () => { H.targets = H.targets.filter(y => y.id !== t.id); hSave(); renderHw(); };
+    act.append(hAttackLink(t, 'btn small' + (x.at <= nowS() ? '' : ' off'), 'Attack'), rm);
+    const lvl = (l && l.level) || t.level;
+    tr.append(nameCell, cell(lvl || '–', 'num' + (max && lvl > max ? ' neg' : '')), st, tm, ck,
+      cell(num(H.opened.get(t.id) || 0), 'num'), act);
+    body.appendChild(tr);
+  }
+  if (!body.children.length) {
+    const td = cell(H.targets.length ? 'No targets match the filter.' : 'Your list is empty.', 'muted');
+    td.colSpan = 7;
+    body.appendChild(el('tr')).appendChild(td);
+  }
+  tickHw();
+}
+
+function ago(ts) {
+  const s = Math.max(0, Math.round(nowS() - ts));
+  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
+}
+
+function tickHw() {
+  if ($('tab-hw').hidden) return;
+  hRenderNext();
+  const now = nowS();
+  document.querySelectorAll('#tab-hw [data-until]').forEach(s => {
+    const left = +s.dataset.until - now;
+    s.textContent = left > 0 ? fmtLeft(left) : s.dataset.done;
+  });
+  document.querySelectorAll('#tab-hw [data-checked]').forEach(s => { s.textContent = ago(+s.dataset.checked); });
+  $('hSession').textContent = fmtLeft((Date.now() - H.sessionStart) / 1000);
+}
+setInterval(tickHw, 1000);
+
+// Kortkommando: A eller mellanslag öppnar attacksidan för nästa tillgängliga mål
+document.addEventListener('keydown', e => {
+  if ($('tab-hw').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+  if (e.key !== 'a' && e.key !== 'A' && e.key !== ' ') return;
+  e.preventDefault();
+  const first = hQueue()[0];
+  if (!first || first.at > nowS()) {
+    setHwStatus('No target is available right now.');
+    setTimeout(() => setHwStatus(''), 2000);
+    return;
+  }
+  window.open(attackUrl(first.t.id), 'torn-attack');
+  hAttack(first.t);
+});
+
+/* ---------- UI ---------- */
+
+function showTab(name) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  $('tab-inv').hidden = name !== 'inv';
+  $('tab-hw').hidden = name !== 'hw';
+  store('tornTab', 'set', name);
+  if (name === 'hw') {
+    renderHw();
+    if (!H.at) hRefresh();
+  }
+  hSetPolling();
+}
+
+function start(k) {
+  key = k;
+  $('setup').hidden = true;
+  $('dash').hidden = false;
+  $('logout').hidden = false;
+  fetchAll();
+  const tab = store('tornTab', 'get');
+  showTab(tab === 'hw' ? 'hw' : 'inv');
+}
+
+// Halloween-kontroller
+const idsFrom = text => [...new Set((String(text).match(/\d{1,9}/g) || []).map(Number).filter(n => n > 0))];
+$('hAddIdsBtn').onclick = () => { addTargets(idsFrom($('hAddIds').value).map(id => ({ id }))); $('hAddIds').value = ''; };
+$('hFacBtn').onclick = async () => {
+  const fid = parseInt($('hFacId').value, 10);
+  if (!fid) return setHwStatus('Enter a faction ID.', true);
+  try {
+    const r = await api(`${V2}/faction/${fid}/members`);
+    addTargets((r.members || []).map(m => ({ id: m.id, name: m.name, level: m.level, fid, status: m.status, last_action: m.last_action })));
+  } catch (e) { setHwStatus(errText(e), true); }
+};
+$('hAtkBtn').onclick = hImportAttacks;
+$('hAtkAuto').checked = hAtkAuto;
+$('hAtkAuto').onchange = e => {
+  hAtkAuto = e.target.checked;
+  store('tornHwAtkAuto', 'set', hAtkAuto ? '1' : '');
+  // Börja från nu: bara spelare du besegrar efter att du slagit på det läggs till automatiskt
+  hAtkSince = Math.floor(nowS());
+  store('tornHwAtkSince', 'set', String(hAtkSince));
+};
+$('hClear').onclick = () => {
+  if (!H.targets.length || !confirm(`Remove all ${H.targets.length} targets from the list?`)) return;
+  H.targets = []; H.live.clear(); hSave(); renderHw();
+};
+$('hRefreshTop').onclick = async () => {
+  const b = $('hRefreshTop');
+  b.disabled = true; b.textContent = '⟳ Checking…';
+  await hRefresh(true);
+  b.disabled = false; b.textContent = '⟳ Refresh';
+};
+$('hAuto').onchange = hSetPolling;
+for (const id of ['hMaxLvl', 'hSkipActive']) $(id).addEventListener(id === 'hMaxLvl' ? 'input' : 'change', () => {
+  store('tornHw_' + id, 'set', id === 'hMaxLvl' ? $(id).value : ($(id).checked ? '1' : ''));
+  renderHw();
+});
+$('hMaxLvl').value = store('tornHw_hMaxLvl', 'get') || '';
+$('hSkipActive').checked = store('tornHw_hSkipActive', 'get') === '1';
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+$('save').onclick = () => {
+  const k = $('key').value.trim();
+  if (!k) return;
+  store(STORE, 'set', k);
+  start(k);
+};
+$('key').onkeydown = e => { if (e.key === 'Enter') $('save').click(); };
+$('invRefresh').onclick = fetchAll;
+$('budget').oninput = render;
+$('bankManual').onchange = e => {
+  bankManual = e.target.checked;
+  if (bankManual) store(BANK_MANUAL, 'set', '1'); else store(BANK_MANUAL, 'del');
+  render();
+};
+$('onlyAfford').onchange = e => { onlyAfford = e.target.checked; render(); };
+document.querySelectorAll('#optTable th[data-sort]').forEach(th => th.onclick = () => {
+  const k = th.dataset.sort;
+  // Första klicket: ROI och utbetalning fallande, övrigt stigande
+  sort = sort.key === k ? { key: k, dir: -sort.dir } : { key: k, dir: ['roi', 'value'].includes(k) ? -1 : 1 };
+  render();
+});
+document.querySelectorAll('#itemTable th[data-isort]').forEach(th => th.onclick = () => {
+  const k = th.dataset.isort;
+  itemSort = itemSort.key === k ? { key: k, dir: -itemSort.dir } : { key: k, dir: ['name', 'type'].includes(k) ? 1 : -1 };
+  render();
+});
+document.querySelectorAll('h2.toggle').forEach(h => h.onclick = () => h.parentElement.classList.toggle('closed'));
+$('logout').onclick = () => {
+  store(STORE, 'del');
+  key = null; inv = null;
+  clearInterval(H.timer);
+  H.live.clear(); H.at = 0; H.comp = null; H.treatsStart = null;
+  $('key').value = '';
+  setStatus('');
+  $('dash').hidden = true;
+  $('logout').hidden = true;
+  $('setup').hidden = false;
+};
+
+const saved = store(STORE, 'get');
+if (saved) start(saved);
+</script>
+</body>
+</html>
