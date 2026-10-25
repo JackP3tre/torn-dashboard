@@ -566,7 +566,7 @@
             <table class="kv">
               <tr class="big"><td>Energy</td><td class="num" id="hEnergy">–</td></tr>
               <tr><td>Attacks left</td><td class="num" id="hAttacksLeft">–</td></tr>
-              <tr><td>Next +5 energy</td><td class="num" id="hTick">–</td></tr>
+              <tr><td id="hTickLabel">Next energy</td><td class="num" id="hTick">–</td></tr>
               <tr><td>Full in</td><td class="num" id="hFull">–</td></tr>
               <tr><td>Drug cooldown</td><td class="num" id="hDrug">–</td></tr>
               <tr><td>Booster cooldown</td><td class="num" id="hBooster">–</td></tr>
@@ -1660,8 +1660,8 @@ function availableAt(m) {
 
 // Varje attack man själv startar kan ge en treat, så målet är många snabba attacker mot lätta mål.
 const H_STORE = 'tornHwTargets';
-const H_POLL = 15_000;           // statuskontroll: ≈ 12 spelare + factions + energi + attacklogg per gång (< 80 anrop/min)
-const H_BATCH = 12;
+const H_POLL = 15_000;           // statuskontroll: ≈ 8 spelare + cooldowns + attacklogg per gång; energin hämtas separat (totalt ≈ 60 anrop/min)
+const H_BATCH = 8;
 const H_RECHECK = 20;            // sekunder efter en attack innan målets nya status kontrolleras
 const ATTACK_ENERGY = 25;
 
@@ -1758,14 +1758,12 @@ async function hRefresh(all = false) {
   try {
     await hAutoImport();
     const now = nowS();
-    const [bars, cds, ps, comp] = await Promise.all([
-      api(`${V2}/user/bars`).catch(() => null),
+    const [cds, ps, comp] = await Promise.all([
       api(`${V2}/user/cooldowns`).catch(() => null),
       api(`${V2}/user/personalstats?stat=attackswon`).catch(() => null),
       api(`${V2}/user/competition`).catch(() => null),   // treats och basket under Halloween
     ]);
     H.at = now;
-    H.bars = bars && bars.bars;
     H.cds = cds && cds.cooldowns;
     const won = ps && Array.isArray(ps.personalstats) ? (ps.personalstats.find(x => x.name === 'attackswon') || {}).value : null;
     if (won != null) { if (H.wonStart == null) H.wonStart = won; H.won = won; }
@@ -1819,9 +1817,39 @@ async function hRefresh(all = false) {
 
 function hSetPolling() {
   clearInterval(H.timer);
-  H.timer = null;
-  if (!$('tab-hw').hidden && $('hAuto').checked) H.timer = setInterval(hRefresh, H_POLL);
+  clearInterval(H.eTimer);
+  H.timer = H.eTimer = null;
+  if ($('tab-hw').hidden) return;
+  if ($('hAuto').checked) H.timer = setInterval(hRefresh, H_POLL);
+  // Energin hämtas live, oberoende av statuskontrollerna
+  H.eTimer = setInterval(hFetchEnergy, E_POLL);
 }
+
+// Live-energi: ett lätt anrop (/user/bars) var 5:e sekund och direkt när du kommer tillbaka till fliken
+const E_POLL = 5_000;
+async function hFetchEnergy() {
+  if (!key || H.eBusy) return;
+  H.eBusy = true;
+  try {
+    const r = await api(`${V2}/user/bars`);
+    if (r.bars) {
+      H.bars = r.bars;
+      H.barsAt = nowS();        // energin räknas fram från den här tidpunkten
+      H.spentSince = 0;         // attacker öppnade efter hämtningen dras av lokalt
+      renderEnergy();
+    }
+  } catch { /* försöker igen om 5 sekunder */ } finally {
+    H.eBusy = false;
+  }
+}
+
+const hOnVisible = () => {
+  if (document.hidden || $('tab-hw').hidden || !key) return;
+  hFetchEnergy();
+  if (nowS() - H.at > 10) hRefresh();
+};
+document.addEventListener('visibilitychange', hOnVisible);
+window.addEventListener('focus', hOnVisible);
 
 const hMaxLvl = () => parseInt($('hMaxLvl').value, 10) || null;
 
@@ -1852,6 +1880,7 @@ function hAttack(t) {
   H.attackedAt.set(t.id, nowS());
   H.opened.set(t.id, (H.opened.get(t.id) || 0) + 1);
   H.openedTotal++;
+  H.spentSince = (H.spentSince || 0) + ATTACK_ENERGY;   // energin minskar direkt, rättas vid nästa hämtning
   H.nextKey = null;
   renderHw();
 }
@@ -1923,16 +1952,7 @@ function renderHw() {
   H.nextKey = null;
   hRenderNext();
 
-  // Energi: en attack kostar 25 energi
-  const e = H.bars && H.bars.energy;
-  if (e) {
-    $('hEnergy').textContent = `${num(e.current)} / ${num(e.maximum)}`;
-    $('hAttacksLeft').textContent = num(Math.floor(e.current / ATTACK_ENERGY));
-    $('hLowEnergy').hidden = e.current >= ATTACK_ENERGY;
-    $('hEnergyBar').firstElementChild.style.width = Math.min(100, e.current / e.maximum * 100) + '%';
-    $('hTick').innerHTML = ''; $('hTick').append(e.tick_time ? timerEl(H.at + e.tick_time, 'now') : '–');
-    $('hFull').innerHTML = ''; $('hFull').append(e.full_time ? timerEl(H.at + e.full_time, 'Full') : el('span', 'pos', 'Full'));
-  }
+  renderEnergy();
   for (const [k, id] of [['drug', 'hDrug'], ['booster', 'hBooster']]) {
     const s = H.cds ? H.cds[k] : null;
     $(id).innerHTML = '';
@@ -2001,8 +2021,44 @@ function ago(ts) {
   return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
 }
 
+// Energin räknas fram live: värdet från Torn + energi som tickat in sedan dess − attacker öppnade sedan dess.
+// Torn ger tick_time/full_time som sekunder kvar (stora värden tolkas som tidsstämplar för säkerhets skull).
+function energyNow() {
+  const e = H.bars && H.bars.energy;
+  if (!e || !H.barsAt) return null;
+  const now = nowS(), base = H.barsAt;
+  const rel = v => (v > 1e9 ? v - base : v);
+  const tick = rel(e.tick_time), interval = e.interval || 900, inc = e.increment || 5;
+  let cur = e.current, nextTick = null;
+  if (cur < e.maximum && tick > 0) {
+    const elapsed = now - base;
+    const ticks = elapsed >= tick ? 1 + Math.floor((elapsed - tick) / interval) : 0;
+    cur = Math.min(e.maximum, cur + ticks * inc);
+    nextTick = cur < e.maximum ? base + tick + ticks * interval : null;
+  }
+  cur = Math.max(0, cur - (H.spentSince || 0));
+  // Tid tills full: resterande energi delat på ökningen per tick
+  const full = cur >= e.maximum ? null
+    : (nextTick || now + interval) + Math.max(0, Math.ceil((e.maximum - cur) / inc) - 1) * interval;
+  return { cur, max: e.maximum, inc, nextTick, full };
+}
+
+function renderEnergy() {
+  const s = energyNow();
+  if (!s) return;
+  $('hEnergy').textContent = `${num(s.cur)} / ${num(s.max)}`;
+  $('hAttacksLeft').textContent = num(Math.floor(s.cur / ATTACK_ENERGY));
+  $('hLowEnergy').hidden = s.cur >= ATTACK_ENERGY;
+  $('hEnergyBar').firstElementChild.style.width = Math.min(100, s.cur / s.max * 100) + '%';
+  $('hTickLabel').textContent = `Next +${s.inc} energy`;
+  $('hTick').textContent = s.nextTick ? fmtLeft(s.nextTick - nowS()) : s.cur >= s.max ? '–' : '…';
+  $('hFull').innerHTML = '';
+  $('hFull').append(s.full ? fmtLeft(s.full - nowS()) : el('span', 'pos', 'Full'));
+}
+
 function tickHw() {
   if ($('tab-hw').hidden) return;
+  renderEnergy();
   hRenderNext();
   const now = nowS();
   document.querySelectorAll('#tab-hw [data-until]').forEach(s => {
@@ -2039,6 +2095,7 @@ function showTab(name) {
   store('tornTab', 'set', name);
   if (name === 'hw') {
     renderHw();
+    hFetchEnergy();
     if (!H.at) hRefresh();
   }
   hSetPolling();
@@ -2081,7 +2138,7 @@ $('hClear').onclick = () => {
 $('hRefreshTop').onclick = async () => {
   const b = $('hRefreshTop');
   b.disabled = true; b.textContent = '⟳ Checking…';
-  await hRefresh(true);
+  await Promise.all([hRefresh(true), hFetchEnergy()]);
   b.disabled = false; b.textContent = '⟳ Refresh';
 };
 $('hAuto').onchange = hSetPolling;
@@ -2125,7 +2182,8 @@ $('logout').onclick = () => {
   store(STORE, 'del');
   key = null; inv = null;
   clearInterval(H.timer);
-  H.live.clear(); H.at = 0; H.comp = null; H.treatsStart = null;
+  clearInterval(H.eTimer);
+  H.live.clear(); H.at = 0; H.comp = null; H.treatsStart = null; H.bars = null; H.barsAt = 0; H.spentSince = 0;
   $('key').value = '';
   setStatus('');
   $('dash').hidden = true;
